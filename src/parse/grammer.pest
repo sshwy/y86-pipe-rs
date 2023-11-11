@@ -1,0 +1,58 @@
+WHITESPACE = _{ " " | "\t" }
+comments   =  { "#" ~ (!NEWLINE ~ ANY)* }
+
+/// comma (,) surrounded with possible spaces
+spaced_comma = _{ WHITESPACE* ~ "," ~ WHITESPACE* }
+
+/// numeric values (decimal and hexical)
+num = { "-"? ~ ("0x" ~ ('0' .. '9' | 'a' .. 'f')+ | ('0'..'9')+) }
+
+/// immediate values (decimal and hexical)
+imm = { "$" ~ num }
+
+/// registers
+reg = @{ "%" ~ ("rax" | "rbx" | "rcx" | "rdx" | "rdi" | "rsi" | "rsp" | "rbp" | "r8" | "r9" | "r10" | "r11" | "r12" | "r13" | "r14") }
+
+/// address mode expression
+addr = { num? ~ "(" ~ reg ~ ")" }
+
+/// label symbol
+label = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+cc_suf = { "le" | "l" | "ge" | "g" | "e" | "ne" }
+
+/// Instructions
+i_single = { "ret" | "halt" | "nop" }
+i_cmovq  = { ("rrmovq" | "cmov" ~ cc_suf) ~ WHITESPACE* ~ reg ~ spaced_comma ~ reg }
+i_mrmovq = { "mrmovq" ~ WHITESPACE* ~ addr ~ spaced_comma ~ reg }
+i_rmmovq = { "rmmovq" ~ WHITESPACE* ~ reg ~ spaced_comma ~ addr }
+i_irmovq = { "irmovq" ~ WHITESPACE* ~ (imm | label) ~ spaced_comma ~ reg }
+i_opq    = { ("andq" | "addq" | "subq" | "orq" | "xorq") ~ WHITESPACE* ~ reg ~ spaced_comma ~ reg }
+i_iopq   = { ("iandq" | "iaddq" | "isubq" | "iorq" | "ixorq") ~ WHITESPACE* ~ (imm | label) ~ spaced_comma ~ reg }
+i_jx     = { "j" ~ (cc_suf | "mp") ~ WHITESPACE* ~ label }
+i_call   = { "call" ~ WHITESPACE* ~ label }
+i_pushq  = { "pushq" ~ WHITESPACE* ~ reg }
+i_popq   = { "popq" ~ WHITESPACE* ~ reg }
+
+/// Directives
+d_pos   = { ".pos" ~ WHITESPACE* ~ num }
+d_data  = { (".byte" | ".word" | ".long" | ".quad") ~ WHITESPACE* ~ (num | label) }
+d_align = { ".align" ~ WHITESPACE* ~ num }
+
+/// can be placed at the end of a line
+line_sep = _{ comments? }
+
+/// can be placed at the begining of a line.
+/// each line can have leading white spaces
+line_prefix = { WHITESPACE* ~ (label ~ ":" ~ WHITESPACE*)? }
+
+line = {
+    line_prefix ~ (i_mrmovq | i_irmovq | i_rmmovq | i_opq | i_iopq | i_jx | i_cmovq | i_call | i_single | i_pushq | i_popq // instructions
+  | d_pos | d_data | d_align // directives
+  )? // can be nothing
+  ~ line_sep // contains comments
+}
+main = {
+    SOI ~ line? // the first line is not required to have leading newline
+  ~ (NEWLINE ~ line)* ~ EOI
+}
