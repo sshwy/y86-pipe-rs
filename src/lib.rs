@@ -11,11 +11,11 @@ pub use asm::AssembleOption;
 #[macro_export]
 macro_rules! define_devices {
     ($(
-        $(#[$att:meta])?
+        $(#[$att:meta])*
         $dev_name:ident $dev_short_name:ident {
         $(.input( $($iname:ident : $itype:ty),* ))?
         $(.output( $($oname:ident : $otype:ty),* ))?
-        $(.pass( $($pname:ident : $ptype:ty),* ))?
+        $(.pass( $($pname:ident : $ptype:ty = $pdefault:expr),* ))?$([$pvar:ident])?
         $($sname:ident : $stype:ty),* $(,)?
     } $($body:block)?)*) => {
         pub mod dev_sig_in {
@@ -36,6 +36,32 @@ macro_rules! define_devices {
                 $($(pub $pname: $ptype, )*)?
             })*
         }
+        // pub mod dev_pass {
+        //     #![allow(unused)]
+        //     #![allow(unused_imports)]
+        //     use super::*;
+        //     $(#[derive(Default, Debug, Clone)]
+        //     pub struct $dev_name {
+        //         $($(pub $pname: $ptype, )*)?
+        //     }
+        //     impl $dev_name {
+        //         pub fn load_input(input: dev_sig_in::$dev_name) -> Self {
+        //             Self {
+        //                 $($( $pname: input.$pname, )*)?
+        //             }
+        //         }
+        //         pub fn load_output(output: dev_sig_out::$dev_name) -> Self {
+        //             Self {
+        //                 $($( $pname: output.$pname, )*)?
+        //             }
+        //         }
+        //         pub fn load_default() -> Self {
+        //             Self {
+        //                 $($( $pname: $pdefault, )*)?
+        //             }
+        //         }
+        //     })*
+        // }
         #[derive(Default, Debug, Clone)]
         pub struct DeviceInputSignal {
             $(pub $dev_short_name: dev_sig_in::$dev_name),*
@@ -51,7 +77,7 @@ macro_rules! define_devices {
         }
 
         $( #[allow(unused)]
-        $(#[$att])?
+        $(#[$att])*
         struct $dev_name {
              $(pub $sname: $stype ),*
         } )*
@@ -64,7 +90,18 @@ macro_rules! define_devices {
             ) {
                 let dev_sig_in::$dev_name{$($( $iname, )*)? .. } = inputs;
                 let dev_sig_out::$dev_name{$($( $oname, )*)? .. } = outputs;
-                $($( outputs.$pname = inputs.$pname; )*)?
+
+                $(
+                    if inputs.bubble {
+                        $( outputs.$pname = $pdefault; )*
+                    } else if !inputs.stall {
+                        $( outputs.$pname = inputs.$pname; )*
+                    } else {
+                        panic!("bubble and stall at the same time")
+                    }
+                )?
+                // $( let $pvar = dev_pass::$dev_name::load_default(); )?
+
                 $($body)?
             }
         } )*
