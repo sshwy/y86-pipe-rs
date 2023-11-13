@@ -16,7 +16,7 @@ macro_rules! define_devices {
         $(.input( $($iname:ident : $itype:ty),* ))?
         $(.output( $($oname:ident : $otype:ty),* ))?
         $(.pass( $($pname:ident : $ptype:ty),* ))?
-        $($sname:ident : $stype:ty),*
+        $($sname:ident : $stype:ty),* $(,)?
     } $($body:block)?)*) => {
         pub mod dev_sig_in {
             #![allow(unused_imports)]
@@ -90,7 +90,7 @@ macro_rules! define_devices {
             }
         }
 
-        pub fn hardware_setup<T>(rcd: &mut $crate::record::RecordBuilder<'_, DeviceInputSignal, T>) {
+        pub fn hardware_setup<T>(rcd: &mut $crate::record::RecordBuilder<'_, DeviceInputSignal, DeviceOutputSignal, T>) {
             $(
                rcd.add_device_node(stringify!($dev_short_name));
                $( $( rcd.add_device_input(stringify!($dev_short_name), stringify!($iname)); )* )?
@@ -148,8 +148,11 @@ macro_rules! hcl {
             $nex: &mut DeviceInputSignal,
             $cur: DeviceOutputSignal,
             devices: &mut Devices,
-        ) -> DeviceOutputSignal {
+        ) -> (DeviceOutputSignal, $crate::record::TransLog) {
             use $crate::isa::inst_code::*;
+            use $crate::isa::reg_code::*;
+            use $crate::isa::op_code::*;
+            // use $crate::isa::cond_fn as COND;
             use $crate::mtc;
             let $fstage = $cur.f.clone();
             let $dstage = $cur.d.clone();
@@ -168,11 +171,17 @@ macro_rules! hcl {
             hardware_setup(&mut rcd);
 
             $(
-                let mut $oname = |$nex: &mut DeviceInputSignal, $inter: &mut IntermediateSignal| {
+                let mut $oname = |
+                    $nex: &mut DeviceInputSignal,
+                    $inter: &mut IntermediateSignal,
+                    logs: &mut $crate::record::TransLog,
+                    $cur: DeviceOutputSignal,
+                | {
                     $(
                         $(if ($cond) as u8 != 0 {
                             $inter.$oname = $val;
-                        })*
+                            logs.push(( stringify!($oname), stringify!($val) ))
+                        })else*
                     )?
                     $( $inter.$oname = $final; )?
                     $( $to = $inter.$oname.to_owned(); )*
@@ -195,38 +204,22 @@ macro_rules! hcl {
                 $( rcd.add_rev_deps(stringify!( $oname ), stringify!( $to )); )*
             )*
 
-            let mut rcd = rcd.build($nex, $inter);
+            let mut rcd = rcd.build($nex, $cur, $inter);
 
             let order = rcd.toporder();
-            let mut new_cur = $cur.clone();
+            let mut logs = Vec::new();
             for (is_device, name) in order {
                 if is_device {
-                    let devin = rcd.clone_devin();
-                    devices.run_name(name, (devin, &mut new_cur));
-                } else {
-                    rcd.run_name(name);
+                    let (mut devin, mut devout) = rcd.clone_devsigs();
+                    devices.run_name(name, (devin, &mut devout));
+                    rcd.update_devout(devout)
+                } else { // combinatorial logics do not change output (cur)
+                    rcd.run_name(name, &mut logs);
                 }
             }
-            new_cur
+            // todo: register execution, status handling
+            (rcd.clone_devsigs().1, logs)
         }
-
-        // pub mod update {
-        //     #![allow(unused)]
-        //     $( use $uty; )*
-        //     use $hardware::{DeviceInputSignal, DeviceOutputSignal};
-        //     $(pub fn $oname(
-        //         $inter: &mut super::IntermediateSignal,
-        //         $cur: DeviceInputSignal,
-        //         $nex: DeviceOutputSignal
-        //     ) {
-        //         use crate::isa::inst_code::*;
-        //         use crate::mtc;
-        //         $($(if ($cond) as u8 != 0 {
-        //             $inter.$oname = $crate::hcl_expr!{@ctxt[$hardware;$cur;$nex;$inter;] $val };
-        //         })*)?
-        //         $( $inter.$oname = $final; )?
-        //     } )*
-        // }
     };
 }
 

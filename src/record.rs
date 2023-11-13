@@ -2,10 +2,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use regex::Regex;
 
-type Updater<'a, DevIn, Inter> = Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter)>;
+pub type TransLog = Vec<(&'static str, &'static str)>;
+// return (receiver, producier)
+pub type Updater<'a, DevIn, DevOut, Inter> =
+    Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut)>;
 
-pub struct RecordBuilder<'a, DevIn, Inter> {
+pub struct RecordBuilder<'a, DevIn, DevOut, Inter> {
     runnable_nodes: Vec<(bool, &'static str)>,
+    device_nodes: Vec<String>,
     nodes: BTreeSet<String>,
     edges: Vec<(String, String)>,
     passed_devices: BTreeSet<&'static str>,
@@ -13,16 +17,17 @@ pub struct RecordBuilder<'a, DevIn, Inter> {
     rev_deps: Vec<(String, String)>,
     // abbrs for pass output
     abbrs: Vec<(&'static str, &'static str)>,
-    updates: BTreeMap<&'static str, Updater<'a, DevIn, Inter>>,
+    updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
     output_prefix: &'static str,
     input_prefix: &'static str,
 }
 
-impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
+impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, Inter> {
     pub fn new(output_prefix: &'static str, input_prefix: &'static str) -> Self {
         Self {
             nodes: Default::default(),
             runnable_nodes: Default::default(),
+            device_nodes: Default::default(),
             deps: Default::default(),
             rev_deps: Default::default(),
             edges: Default::default(),
@@ -46,6 +51,7 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
     }
     pub fn add_device_node(&mut self, dev_name: &'static str) {
         self.runnable_nodes.push((true, dev_name));
+        self.device_nodes.push(dev_name.to_string());
     }
     pub fn add_device_input(&mut self, dev_name: &'static str, field_name: &'static str) {
         self.add_edge(
@@ -73,7 +79,7 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
         &mut self,
         name: &'static str,
         body: &'static str,
-        func: &'a mut impl FnMut(&mut DevIn, &mut Inter),
+        func: &'a mut impl FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut),
     ) {
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
@@ -94,7 +100,9 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
             let body = self.replace_abbr(body);
             // dbg!(&body);
             for node in &self.nodes {
-                if node != name && body.contains(node) {
+                // edges from device to there inputs/outputs has already bean added
+                // thus is filtered out
+                if node != name && body.contains(node) && !self.device_nodes.contains(node) {
                     new_edges.push((node.to_string(), name.to_string()));
                 }
             }
@@ -102,7 +110,9 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
         for (name, body) in &self.rev_deps {
             let body = self.replace_abbr(body);
             for node in &self.nodes {
-                if node != name && body.contains(node) {
+                // edges from device to there inputs/outputs has already bean added
+                // thus is filtered out
+                if node != name && body.contains(node) && !self.device_nodes.contains(node) {
                     new_edges.push((name.to_string(), node.to_string()));
                 }
             }
@@ -114,7 +124,6 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
     // return Vec<(is_device, name)>
     pub fn toporder(&mut self) -> Vec<(bool, &'static str)> {
         self.init_deps();
-        dbg!(&self.nodes);
 
         let mut degree: HashMap<String, i32> = HashMap::default();
         for (_, to) in &self.edges {
@@ -132,14 +141,12 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
         let mut order = Vec::new();
         while let Some(head) = que.pop_front() {
             degree.remove(head);
-            if let Some(rnode) = self
-                .runnable_nodes
-                .iter()
-                .find(|(_, p)| p == head)
-            {
+            if let Some(rnode) = self.runnable_nodes.iter().find(|(_, p)| p == head) {
                 order.push(*rnode);
             }
             for (from, to) in &self.edges {
+                // make sure stage registers are not depended
+                assert!(!self.passed_devices.contains(from.as_str()));
                 if from == head {
                     let entry = degree.get_mut(to).unwrap();
                     *entry -= 1;
@@ -150,23 +157,31 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
             }
         }
 
-        // dbg!(&self.edges);
-        // dbg!(&self.deps);
-        dbg!(&order);
+        eprintln!("edges: {:?}", &self.edges);
 
         if !degree.is_empty() {
             panic!("not DAG, degrees: {:?}", degree)
         }
 
+        let (mut last, mut order): (Vec<(bool, &'static str)>, Vec<(bool, &'static str)>) = order
+            .into_iter()
+            .partition(|o| o.0 && self.passed_devices.contains(o.1));
+
+        // put passed device (mainly stage registers) at the end
+        order.append(&mut last);
+
+        eprintln!("order: {:?}", &order);
         order
     }
     pub fn build(
         mut self,
         devin: &'a mut DevIn,
+        devout: DevOut,
         context: &'a mut Inter,
-    ) -> Record<'a, DevIn, Inter> {
+    ) -> Record<'a, DevIn, DevOut, Inter> {
         Record {
             devin,
+            devout,
             context,
             order: self.toporder(),
             updates: self.updates,
@@ -174,23 +189,27 @@ impl<'a, DevIn: Clone, Inter> RecordBuilder<'a, DevIn, Inter> {
     }
 }
 
-pub struct Record<'a, DevIn, Inter> {
+pub struct Record<'a, DevIn, DevOut, Inter> {
     devin: &'a mut DevIn,
     context: &'a mut Inter,
+    devout: DevOut,
     order: Vec<(bool, &'static str)>,
-    updates: BTreeMap<&'static str, Updater<'a, DevIn, Inter>>,
+    updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
 }
 
-impl<'a, DevIn: Clone, Inter> Record<'a, DevIn, Inter> {
-    pub fn run_name(&mut self, name: &'static str) {
+impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
+    pub fn run_name(&mut self, name: &'static str, trace: &mut TransLog) {
         if let Some(func) = self.updates.get_mut(name) {
-            func(self.devin, self.context)
+            func(self.devin, self.context, trace, self.devout.clone())
         } else {
             panic!("invalid name")
         }
     }
-    pub fn clone_devin(&self) -> DevIn {
-        self.devin.clone()
+    pub fn clone_devsigs(&self) -> (DevIn, DevOut) {
+        (self.devin.clone(), self.devout.clone())
+    }
+    pub fn update_devout(&mut self, devout: DevOut) {
+        self.devout = devout
     }
     pub fn toporder(&self) -> Vec<(bool, &'static str)> {
         self.order.clone()
@@ -199,7 +218,7 @@ impl<'a, DevIn: Clone, Inter> Record<'a, DevIn, Inter> {
 
 #[cfg(test)]
 mod tests {
-    use crate::record::RecordBuilder;
+    use crate::record::{RecordBuilder, TransLog};
 
     #[test]
     fn test() {
@@ -207,17 +226,18 @@ mod tests {
         let mut x = ();
         let mut rcd = RecordBuilder::new("o", "i");
         let b = 2u64;
-        let mut updater = |_: &mut (), a: &mut u64| {
+        let mut updater = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
             *a = b;
         };
-        let mut updater2 = |_: &mut (), a: &mut u64| {
+        let mut updater2 = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
             *a = *a + b;
         };
+        let mut logs = Vec::new();
         rcd.add_update("test", "", &mut updater);
         rcd.add_update("test2", "", &mut updater2);
-        let mut rcd = rcd.build(&mut x, &mut a);
-        rcd.run_name("test");
-        rcd.run_name("test2");
+        let mut rcd = rcd.build(&mut x, (), &mut a);
+        rcd.run_name("test", &mut logs);
+        rcd.run_name("test2", &mut logs);
         println!("a = {}, b = {}", a, b);
     }
 }

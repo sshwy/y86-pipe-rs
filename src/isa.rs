@@ -16,43 +16,60 @@ pub mod inst_code {
     pub const PUSHQ: u8 = 0xa;
     pub const POPQ: u8 = 0xb;
 }
+pub mod reg_code {
+    pub const RAX: u8 = 0;
+    pub const RCX: u8 = 1;
+    pub const RDX: u8 = 2;
+    pub const RBX: u8 = 3;
+    pub const RSP: u8 = 4;
+    pub const RBP: u8 = 5;
+    pub const RSI: u8 = 6;
+    pub const RDI: u8 = 7;
+    pub const R8: u8 = 8;
+    pub const R9: u8 = 9;
+    pub const R10: u8 = 0xa;
+    pub const R11: u8 = 0xb;
+    pub const R12: u8 = 0xc;
+    pub const R13: u8 = 0xd;
+    pub const R14: u8 = 0xe;
+    pub const RNONE: u8 = 0xf;
+}
 
-// Instruction code
-// #[derive(Debug, Clone, Copy)]
-// pub enum InstCode {
-//     HALT = 0x0,
-//     NOP = 0x1,
-//     CMOVX = 0x2,
-//     IRMOVQ = 0x3,
-//     RMMOVQ = 0x4,
-//     MRMOVQ = 0x5,
-//     OPQ = 0x6,
-//     JX = 0x7,
-//     CALL = 0x8,
-//     RET = 0x9,
-//     PUSHQ = 0xa,
-//     POPQ = 0xb,
-// }
+pub mod op_code {
+    pub const ADD: u8 = 0;
+    pub const SUB: u8 = 1;
+    pub const AND: u8 = 2;
+    pub const XOR: u8 = 3;
+}
 
+pub mod cond_fn {
+    pub const YES: u8 = 0;
+    pub const LE: u8 = 1;
+    pub const L: u8 = 2;
+    pub const E: u8 = 3;
+    pub const NE: u8 = 4;
+    pub const GE: u8 = 5;
+    pub const G: u8 = 6;
+}
 /// registers
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Reg {
-    RAX = 0,
-    RCX = 1,
-    RDX = 2,
-    RBX = 3,
-    RSP = 4,
-    RBP = 5,
-    RSI = 6,
-    RDI = 7,
-    R8 = 8,
-    R9 = 9,
-    R10 = 0xa,
-    R11 = 0xb,
-    R12 = 0xc,
-    R13 = 0xd,
-    R14 = 0xe,
+    RAX = reg_code::RAX as isize,
+    RCX = reg_code::RCX as isize, // 1,
+    RDX = reg_code::RDX as isize, // 2,
+    RBX = reg_code::RBX as isize, // 3,
+    RSP = reg_code::RSP as isize, // 4,
+    RBP = reg_code::RBP as isize, // 5,
+    RSI = reg_code::RSI as isize, // 6,
+    RDI = reg_code::RDI as isize, // 7,
+    R8 = reg_code::R8 as isize,   // 8,
+    R9 = reg_code::R9 as isize,   // 9,
+    R10 = reg_code::R10 as isize, // 0xa,
+    R11 = reg_code::R11 as isize, // 0xb,
+    R12 = reg_code::R12 as isize, // 0xc,
+    R13 = reg_code::R13 as isize, // 0xd,
+    R14 = reg_code::R14 as isize, // 0xe,
     RNONE = 0xf,
 }
 

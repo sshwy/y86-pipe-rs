@@ -3,19 +3,37 @@
 use std::cell::RefCell;
 
 use super::Stat;
+use crate::isa::cond_fn::*;
+use crate::isa::op_code::*;
+use crate::isa::reg_code::*;
 use crate::{
     define_devices,
-    object::{get_u64, BIN_SIZE},
+    object::{get_u64, put_u64, BIN_SIZE},
 };
 
 define_devices! {
     // stage registers
-    Fstage f { .pass(pred_pc: u64) }
-    Dstage d { .pass(stat: Stat, icode: u8, ifun: u8, ra: u8, rb: u8, valc: u64, valp: u64) }
-    Estage e { .pass(stat: Stat, icode: u8, ifun: u8, vala: u64, valb: u64, valc: u64,
-                dste: u64, dstm: u64, srca: u64, srcb: u64) }
-    Mstage m { .pass(stat: Stat, icode: u8, cnd: u8, vale: u64, vala: u64, dste: u64, dstm: u64) }
-    Wstage w { .pass(stat: Stat, icode: u8, vale: u64, valm: u64, dste: u64, dstm: u64) }
+    Fstage f {
+        .input(stall: bool, bubble: bool)
+        .pass(pred_pc: u64)
+    }
+    Dstage d {
+        .input(stall: bool, bubble: bool)
+        .pass(stat: Stat, icode: u8, ifun: u8, ra: u8, rb: u8, valc: u64, valp: u64)
+    }
+    Estage e {
+        .input(stall: bool, bubble: bool)
+        .pass(stat: Stat, icode: u8, ifun: u8, vala: u64, valb: u64, valc: u64,
+                dste: u8, dstm: u8, srca: u8, srcb: u8)
+    }
+    Mstage m {
+        .input(stall: bool, bubble: bool)
+        .pass(stat: Stat, icode: u8, cnd: bool, vale: u64, vala: u64, dste: u8, dstm: u8)
+    }
+    Wstage w {
+        .input(stall: bool, bubble: bool)
+        .pass(stat: Stat, icode: u8, vale: u64, valm: u64, dste: u8, dstm: u8)
+    }
 
     InstructionMemory imem { // with split
         .input(pc: u64)
@@ -59,21 +77,90 @@ define_devices! {
         *new_pc = x;
     }
 
-    // ArithmetcLogicUnit alu {
-    //     .input(a: u64, b: u64, fun: u8)
-    //     .output(sf: u8, of: u8, zf: u8, e: u64)
-    // } {
-    //     let c = match OpFn::from(fun) {
-    //         OpFn::ADD => a + b,
-    //         OpFn::SUB => a - b,
-    //         OpFn::AND => a & b,
-    //         OpFn::XOR => a ^ b,
-    //     };
-    //     *sf = (c >> 31 & 1) as u8;
-    //     *of = (((a ^ c) & !(a ^ b)) >> 31 & 1) as u8;
-    //     *zf = if c == 0 { 1u8 } else { 0u8 };
-    //     *e = c;
-    // }
+    RegisterFile reg_file {
+        .input(srca: u8, srcb: u8)
+        .output(vala: u64, valb: u64)
+        state: [u64; 16]
+    } {
+        if srca != RNONE {
+            *vala = state[srca as usize];
+        }
+        if srcb != RNONE {
+            *valb = state[srcb as usize];
+        }
+    }
+
+    ArithmetcLogicUnit alu {
+        .input(a: u64, b: u64, fun: u8)
+        .output(e: u64)
+    } {
+        *e = match fun {
+            ADD => a + b,
+            SUB => a - b,
+            AND => a & b,
+            XOR => a ^ b,
+            _ => 0,
+        };
+    }
+
+    ConditionCode cc {
+        .input(set_cc: bool, a: u64, b: u64, e: u64, opfun: u8)
+        .output(sf: bool, of: bool, zf: bool)
+        s_sf: bool,
+        s_of: bool,
+        s_zf: bool,
+    } {
+        let cur_sf = (e >> 31 & 1) != 0;
+        let cur_zf = e == 0;
+        let cur_of = match opfun {
+            ADD | SUB => (((a ^ e) & !(a ^ b)) >> 31 & 1) != 0,
+            _ => false
+        };
+        if set_cc {
+            *s_sf = cur_sf;
+            *s_of = cur_of;
+            *s_zf = cur_zf;
+        }
+        *sf = *s_sf;
+        *of = *s_of;
+        *zf = *s_zf;
+    }
+
+    Condition cond {
+        .input(condfun: u8, sf: bool, of: bool, zf: bool)
+        .output(cnd: bool)
+    } {
+        *cnd = match condfun {
+            YES => true,
+            E => zf,
+            NE => !zf,
+            L => sf ^ of,
+            LE => zf || (sf ^ of),
+            GE => !(sf ^ of),
+            G => !zf && !(sf ^ of),
+            _ => false
+        }
+    }
+
+    DataMemory dmem {
+        .input(addr: u64, datain: u64, read: bool, write: bool)
+        .output(dataout: u64, error: bool)
+        binary: RefCell<[u8; BIN_SIZE]>
+    } {
+        if addr + 8 >= BIN_SIZE as u64 {
+            *dataout = 0;
+            *error = true;
+            return
+        }
+        *error = false;
+        if write {
+            let section: &mut [u8] = &mut binary.borrow_mut()[(addr as usize)..];
+            put_u64(section, datain);
+            *dataout = 0;
+        } else if read {
+            *dataout = get_u64(&binary.borrow()[(addr as usize)..]);
+        }
+    }
 }
 
 impl Default for Devices {
@@ -89,7 +176,17 @@ impl Default for Devices {
             },
             ialign: Align {},
             pc_inc: PCIncrement {},
-            // alu: ArithmetcLogicUnit {},
+            reg_file: RegisterFile { state: [0; 16] },
+            alu: ArithmetcLogicUnit {},
+            cc: ConditionCode {
+                s_sf: false,
+                s_of: false,
+                s_zf: false,
+            },
+            cond: Condition {},
+            dmem: DataMemory {
+                binary: [0; BIN_SIZE].into(),
+            },
         }
     }
 }

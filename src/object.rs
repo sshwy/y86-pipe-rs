@@ -19,6 +19,11 @@ pub fn get_u64(binary: &[u8]) -> u64 {
     // }
     res
 }
+pub fn put_u64(binary: &mut [u8], val: u64) {
+    for (i, byte) in binary.iter_mut().enumerate().take(8) {
+        *byte = (val >> (i * 8)) as u8;
+    }
+}
 
 impl From<pest::iterators::Pair<'_, Rule>> for Reg {
     fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
