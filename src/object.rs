@@ -6,7 +6,19 @@ use crate::asm::Rule;
 use crate::isa::{self, Addr, CondFn, OpFn, Reg};
 
 pub const BIN_SIZE: usize = 1 << 16;
-pub type SymbolMap = BTreeMap<String, u16>;
+pub type SymbolMap = BTreeMap<String, u64>;
+
+// little endian
+pub fn get_u64(binary: &[u8]) -> u64 {
+    let mut res = 0;
+    for (i, byte) in binary.iter().enumerate().take(8) {
+        res += (*byte as u64) << (i * 8);
+    }
+    // for i in 0..8 {
+    //     res += (binary[i] as u64) << (i * 8);
+    // }
+    res
+}
 
 impl From<pest::iterators::Pair<'_, Rule>> for Reg {
     fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
@@ -36,15 +48,15 @@ impl From<&str> for CondFn {
     fn from(value: &str) -> Self {
         if value.starts_with("le") {
             Self::LE
-        } else if value.starts_with("l") {
+        } else if value.starts_with('l') {
             Self::L
-        } else if value.starts_with("e") {
+        } else if value.starts_with('e') {
             Self::E
         } else if value.starts_with("ne") {
             Self::NE
         } else if value.starts_with("ge") {
             Self::GE
-        } else if value.starts_with("g") {
+        } else if value.starts_with('g') {
             Self::G
         } else {
             Self::YES
@@ -100,7 +112,7 @@ impl Imm {
     fn desymbol(&self, sym: &SymbolMap) -> u64 {
         match self {
             Imm::Num(n) => *n as u64,
-            Imm::Label(label) => sym[label] as u64,
+            Imm::Label(label) => sym[label],
         }
     }
 }
@@ -111,7 +123,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Imm {
             Self::Label(value.as_str().to_string())
         } else {
             let s = value.as_str();
-            let s = if s.starts_with("$") { &s[1..] } else { s };
+            let s = s.strip_prefix('$').unwrap_or(s);
             let num = if let Ok(r) = s.parse() {
                 r
             } else {
@@ -173,13 +185,13 @@ impl SourceInfo {
                     isa::Inst::RMMOVQ(ra, Addr(dis, rb)) => {
                         obj.binary[addr] = h2!(inst.icode(), 0);
                         obj.binary[addr + 1] = h2!(ra, rb);
-                        let data = dis.unwrap_or(0) as u64;
+                        let data = dis.unwrap_or(0);
                         obj.write_num_data(addr + 2, 8, data);
                     }
                     isa::Inst::MRMOVQ(Addr(dis, rb), ra) => {
                         obj.binary[addr] = h2!(inst.icode(), 0);
                         obj.binary[addr + 1] = h2!(ra, rb);
-                        let data = dis.unwrap_or(0) as u64;
+                        let data = dis.unwrap_or(0);
                         obj.write_num_data(addr + 2, 8, data);
                     }
                     isa::Inst::OPQ(op, ra, rb) => {
@@ -216,7 +228,7 @@ impl SourceInfo {
 
 #[derive(Debug)]
 pub struct SourceInfo {
-    pub addr: Option<u16>,
+    pub addr: Option<u64>,
     pub inst: Option<Inst>,
     pub label: Option<String>,
     // width and data
@@ -236,7 +248,7 @@ pub struct Object {
 impl Object {
     fn write_num_data(&mut self, addr: usize, sz: u8, data: u64) {
         for i in 0..sz as usize {
-            let byte = (data >> (i * 8) % (1 << 8)) as u8;
+            let byte = (data >> (i * 8) & 0xff) as u8;
             self.binary[addr + i] = byte // little endian
         }
     }
@@ -284,7 +296,7 @@ impl Display for ObjectExt {
             } else {
                 write!(f, "{: <29}", "")?
             }
-            write!(f, "| {}\n", src.src)?
+            writeln!(f, "| {}", src.src)?
         }
         Ok(())
     }

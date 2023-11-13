@@ -21,14 +21,12 @@ pub fn parse(src: &str) -> Result<pest::iterators::Pairs<'_, Rule>> {
         .into_inner())
 }
 
+#[derive(Default)]
 pub struct AssembleOption {
     verbose: bool,
 }
 
 impl AssembleOption {
-    pub fn default() -> Self {
-        Self { verbose: false }
-    }
     pub fn set_verbose(mut self, verbose: bool) -> Self {
         self.verbose = verbose;
         self
@@ -46,7 +44,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
     }
     let mut src_infos = Vec::default();
     let lines = parse(src).context("fail to assemble ys file")?;
-    let mut cur_addr = u16::default();
+    let mut cur_addr = u64::default();
 
     for line in lines {
         let src = line.as_str().to_string();
@@ -133,7 +131,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     let num = if let Ok(r) = s.parse() {
                         r
                     } else {
-                        u16::from_str_radix(&s[2..], 16).unwrap()
+                        u64::from_str_radix(&s[2..], 16).unwrap()
                     };
 
                     cur_addr = num;
@@ -156,7 +154,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                         i64::from_str_radix(&s[2..], 16).unwrap()
                     };
                     assert!(num & (-num) == num); // 2^k
-                    let num = num as u16;
+                    let num = num as u64;
                     if cur_addr % num > 0 {
                         cur_addr = cur_addr / num * num + num // ceil
                     }
