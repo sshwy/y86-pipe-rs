@@ -2,7 +2,7 @@ pub mod hardware;
 pub mod pipe_full;
 
 /// Pipeline Pipeline State
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum Stat {
     Aok = 0,
     /// bubble
@@ -13,8 +13,8 @@ pub enum Stat {
     Adr = 3,
     /// invalid instruction
     Ins = 4,
-    /// pipline
-    Pip = 5,
+    // pipline
+    // Pip = 5,
 }
 
 impl Default for Stat {
