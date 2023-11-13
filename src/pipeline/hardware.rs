@@ -4,6 +4,7 @@ use std::cell::RefCell;
 
 use super::Stat;
 use crate::isa::cond_fn::*;
+use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
 use crate::isa::reg_code::*;
 use crate::{
@@ -12,27 +13,35 @@ use crate::{
 };
 
 define_devices! {
-    // stage registers
+    // stage registers and default values for bubble status
+
+    /// Fetch stage
+    /// note that it's not possible to bubble (see hcl)
     Fstage f {
         .input(stall: bool, bubble: bool)
-        .pass(pred_pc: u64)
+        .pass(pred_pc: u64 = 0)
+    } {
     }
     Dstage d {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat, icode: u8, ifun: u8, ra: u8, rb: u8, valc: u64, valp: u64)
+        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
+            ra: u8 = RNONE, rb: u8 = RNONE, valc: u64 = 0, valp: u64 = 0)
     }
     Estage e {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat, icode: u8, ifun: u8, vala: u64, valb: u64, valc: u64,
-                dste: u8, dstm: u8, srca: u8, srcb: u8)
+        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
+            vala: u64 = 0, valb: u64 = 0, valc: u64 = 0, dste: u8 = RNONE,
+            dstm: u8 = RNONE, srca: u8 = RNONE, srcb: u8 = RNONE)
     }
     Mstage m {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat, icode: u8, cnd: bool, vale: u64, vala: u64, dste: u8, dstm: u8)
+        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, cnd: bool = false,
+            vale: u64 = 0, vala: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE)
     }
     Wstage w {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat, icode: u8, vale: u64, valm: u64, dste: u8, dstm: u8)
+        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, vale: u64 = 0,
+            valm: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE)
     }
 
     InstructionMemory imem { // with split
@@ -78,7 +87,7 @@ define_devices! {
     }
 
     RegisterFile reg_file {
-        .input(srca: u8, srcb: u8)
+        .input(srca: u8, srcb: u8, dste: u8, dstm: u8, vale: u64, valm: u64)
         .output(vala: u64, valb: u64)
         state: [u64; 16]
     } {
@@ -87,6 +96,12 @@ define_devices! {
         }
         if srcb != RNONE {
             *valb = state[srcb as usize];
+        }
+        if dste != RNONE {
+            state[dste as usize] = vale;
+        }
+        if dstm != RNONE {
+            state[dstm as usize] = valm;
         }
     }
 

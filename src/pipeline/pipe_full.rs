@@ -20,7 +20,7 @@ f_pc u64 = [
     // Default: Use predicted value of PC
     1 => F.pred_pc;
 ] => i.pc_inc.old_pc
-    => i.imem.pc;
+  => i.imem.pc;
 
 // Determine icode of fetched instruction
 f_icode u8 = [
@@ -222,70 +222,70 @@ m_dstm u8 := M.dstm => i.w.dstm;
 /////////////////// Write back stage ///////////////////
 
 // Set E port register ID
-w_dste u8 := W.dste;
+w_dste u8 := W.dste => i.reg_file.dste;
 
 // Set E port value
-w_vale u64 := W.vale;
+w_vale u64 := W.vale => i.reg_file.vale;
 
 // Set M port register ID
-w_dstm u8 := W.dstm;
+w_dstm u8 := W.dstm => i.reg_file.dstm;
 
 // Set M port value
-w_valm u64 := W.valm;
+w_valm u64 := W.valm => i.reg_file.valm;
 
-// Update processor status
-overall_stat Stat = [
+// Update processor status (used for outside monitoring)
+prog_stat Stat = [
     W.stat == Stat::Bub => Stat::Aok;
     1 => W.stat;
 ];
 
-///////////////// Pipeline Register Control /////////////////////////
+/////////////////// Pipeline Register Control ///////////////////
 
 // Should I stall or inject a bubble into Pipeline Register F?
 // At most one of these can be true.
 f_bubble bool := false => i.f.bubble;
 f_stall bool :=
-	// Conditions for a load/use hazard
-	mtc(E.icode, [ MRMOVQ, POPQ ]) &&
-	 mtc(E.dstm, [ c.d_srca, c.d_srcb ]) ||
-	// Stalling at fetch while ret passes through pipeline
-	mtc(RET, [D.icode, E.icode, M.icode])
+    // Conditions for a load/use hazard
+    mtc(E.icode, [ MRMOVQ, POPQ ]) &&
+     mtc(E.dstm, [ c.d_srca, c.d_srcb ]) ||
+    // Stalling at fetch while ret passes through pipeline
+    mtc(RET, [D.icode, E.icode, M.icode])
     => i.f.stall;
 
 // Should I stall or inject a bubble into Pipeline Register D?
 // At most one of these can be true.
-d_stall bool := 
-	// Conditions for a load/use hazard
-	mtc(E.icode, [MRMOVQ, POPQ]) &&
-	mtc(E.dstm, [c.d_srca, c.d_srcb])
+d_stall bool :=
+    // Conditions for a load/use hazard
+    mtc(E.icode, [MRMOVQ, POPQ]) &&
+    mtc(E.dstm, [c.d_srca, c.d_srcb])
     => i.d.stall;
 
 d_bubble bool :=
-	// Mispredicted branch
-	(E.icode == JX && !c.e_cnd) ||
-	// Stalling at fetch while ret passes through pipeline
-	// but not condition for a load/use hazard
-	!(mtc(E.icode, [ MRMOVQ, POPQ]) && mtc(E.dstm, [c.d_srca, c.d_srcb])) &&
-	  mtc(RET, [D.icode, E.icode, M.icode])
+    // Mispredicted branch
+    (E.icode == JX && !c.e_cnd) ||
+    // Stalling at fetch while ret passes through pipeline
+    // but not condition for a load/use hazard
+    !(mtc(E.icode, [ MRMOVQ, POPQ]) && mtc(E.dstm, [c.d_srca, c.d_srcb])) &&
+      mtc(RET, [D.icode, E.icode, M.icode])
     => i.d.bubble;
 
 // Should I stall or inject a bubble into Pipeline Register E?
 // At most one of these can be true.
 e_stall bool := false => i.e.stall;
 e_bubble bool :=
-	// Mispredicted branch
-	(E.icode == JX && !c.e_cnd) ||
-	// Conditions for a load/use hazard
-	mtc(E.icode, [MRMOVQ, POPQ]) &&
-	mtc(E.dstm, [c.d_srca, c.d_srcb])
+    // Mispredicted branch
+    (E.icode == JX && !c.e_cnd) ||
+    // Conditions for a load/use hazard
+    mtc(E.icode, [MRMOVQ, POPQ]) &&
+    mtc(E.dstm, [c.d_srca, c.d_srcb])
     => i.e.bubble;
 
 // Should I stall or inject a bubble into Pipeline Register M?
 // At most one of these can be true.
 m_stall bool := false => i.m.stall;
 // Start injecting bubbles as soon as exception passes through memory stage
-m_bubble bool := 
-    mtc(c.m_stat, [Stat::Adr, Stat::Ins, Stat::Hlt]) 
+m_bubble bool :=
+    mtc(c.m_stat, [Stat::Adr, Stat::Ins, Stat::Hlt])
     || mtc(W.stat, [Stat::Adr, Stat::Ins, Stat::Hlt])
     => i.m.bubble;
 
