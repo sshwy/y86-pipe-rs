@@ -216,7 +216,7 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
             let $mstage = $cur.m.clone();
             let $wstage = $cur.w.clone();
 
-            let mut rcd = $crate::record::RecordBuilder::new(stringify!($cur), stringify!($nex));
+            let mut rcd = $crate::record::RecordBuilder::new(stringify!($cur), stringify!($nex), preserved_order);
             rcd.add_pass_output(concat!(stringify!($cur), ".f"), stringify!($fstage));
             rcd.add_pass_output(concat!(stringify!($cur), ".d"), stringify!($dstage));
             rcd.add_pass_output(concat!(stringify!($cur), ".e"), stringify!($estage));
@@ -263,7 +263,7 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
             // static PRESERVED_ORDER: std::cell::RefCell<> = None.into();
 
 
-            let mut rcd = rcd.build($nex, $cur, $inter, preserved_order);
+            let mut rcd = rcd.build($nex, $cur, $inter);
 
             let order = rcd.toporder();
             let mut logs = Vec::new();
