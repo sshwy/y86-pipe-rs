@@ -2,8 +2,9 @@
 name = "y86-pipe-rs"
 version = "0.1.0"
 edition = "2021"
-about = "Y86 simulator rust implementation"
-author = "Weiyao Huang <jy.cat@qq.com>"
+license = "MIT"
+description = "Y86 simulator rust implementation"
+authors = ["Weiyao Huang <jy.cat@qq.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

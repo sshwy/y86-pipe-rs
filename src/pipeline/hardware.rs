@@ -12,7 +12,8 @@ use crate::isa::reg_code;
 use crate::isa::reg_code::*;
 use crate::{
     define_devices,
-    object::{get_u64, put_u64, BIN_SIZE},
+    isa::BIN_SIZE,
+    utils::{get_u64, put_u64},
 };
 
 define_devices! {
@@ -138,7 +139,7 @@ define_devices! {
         let cur_zf = e == 0;
         let cur_of = match opfun {
             // a, b have the same sign and a, e have different sign
-            ADD => (!(a ^ b) & (a ^ e)) >> 31 != 0, 
+            ADD => (!(a ^ b) & (a ^ e)) >> 31 != 0,
             // (b - a): a, b have different sign and b, e have different sign
             SUB => ((a ^ b) & (b ^ e)) >> 31 != 0,
             _ => false

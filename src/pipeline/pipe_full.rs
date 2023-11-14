@@ -1,4 +1,4 @@
-use crate::{hcl, object::BIN_SIZE, record::TransLog};
+use crate::{hcl, isa::BIN_SIZE, record::TransLog};
 
 use super::Pipeline;
 
@@ -414,8 +414,8 @@ mod tests {
     use crate::{
         asm::tests::RSUM_YS,
         assemble,
-        object::mem_diff,
         pipeline::{hardware::Devices, pipe_full::Signals, Pipeline},
+        utils::mem_diff,
     };
 
     #[test]
