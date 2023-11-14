@@ -7,8 +7,8 @@ edition = "2021"
 
 # Example of customizing binaries in Cargo.toml.
 [[bin]]
-name = "yas"
-path = "src/bin/yas.rs"
+name = "yars"
+path = "src/main.rs"
 
 [dependencies]
 ansi_term = "0.12.1"
