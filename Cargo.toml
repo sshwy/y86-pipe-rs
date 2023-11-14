@@ -20,3 +20,10 @@ clap = { version = "4.4.8", features = ["derive"] }
 pest = "2.7.5"
 pest_derive = "2.7.5"
 regex = "1.10.2"
+wasm-bindgen = { version = "0.2.88", optional = true }
+
+[features]
+webapp = ["dep:wasm-bindgen"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]

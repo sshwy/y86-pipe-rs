@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.cargo.features": [
+        "webapp"
+    ],
+    "rust-analyzer.check.features": [
+        "webapp"
+    ]
+}

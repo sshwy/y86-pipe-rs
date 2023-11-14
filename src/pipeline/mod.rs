@@ -25,9 +25,12 @@ impl Default for Stat {
 
 /// pipeline runner
 pub struct Pipeline<Sigs: Default, Devices> {
-    order: Option<NameList>,
+    pub(crate) order: Option<NameList>,
+    /// signals are returned after each step, thus set to private
     runtime_signals: Sigs,
-    devices: Devices,
+    /// devices are not easily made clone, thus it's up to app to decide which information to save.
+    pub(crate) devices: Devices,
+    /// we have [`is_terminate`]
     terminate: bool,
 }
 

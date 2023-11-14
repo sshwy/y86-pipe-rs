@@ -297,7 +297,7 @@ w_bubble bool := false => i.w.bubble;
 }
 
 impl Pipeline<Signals, Devices> {
-    pub fn step(&mut self) -> TransLog {
+    pub fn step(&mut self) -> (Signals, TransLog) {
         println!("{:=^60}", " Run Cycle ");
         let (devout, log, order) = Self::update(
             &mut self.runtime_signals.2,
@@ -337,7 +337,10 @@ impl Pipeline<Signals, Devices> {
         self.runtime_signals.1.cond = cond;
         self.runtime_signals.1.dmem = dmem;
 
+        // processor state after this cycle
+        let saved_state = self.runtime_signals.clone();
         self.print_state();
+
         let stat = self.runtime_signals.2.prog_stat;
         if stat != Stat::Aok && stat != Stat::Bub {
             self.terminate = true;
@@ -353,7 +356,7 @@ impl Pipeline<Signals, Devices> {
 
         // pass the computed toporder
         self.order = Some(order);
-        log
+        (saved_state, log)
     }
 
     pub fn mem(&self) -> [u8; BIN_SIZE] {
