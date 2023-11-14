@@ -2,37 +2,61 @@
 
 use std::mem::transmute;
 
-pub mod inst_code {
-    pub const HALT: u8 = 0x0;
-    pub const NOP: u8 = 0x1;
-    pub const CMOVX: u8 = 0x2;
-    pub const IRMOVQ: u8 = 0x3;
-    pub const RMMOVQ: u8 = 0x4;
-    pub const MRMOVQ: u8 = 0x5;
-    pub const OPQ: u8 = 0x6;
-    pub const JX: u8 = 0x7;
-    pub const CALL: u8 = 0x8;
-    pub const RET: u8 = 0x9;
-    pub const PUSHQ: u8 = 0xa;
-    pub const POPQ: u8 = 0xb;
+macro_rules! define_code {
+    {
+        @mod $modname:ident;
+        @type $typ:ty;
+        $( $cname:ident = $cval:expr; )*
+    } => {
+        pub mod $modname {
+            $(pub const $cname : $typ = $cval; )*
+            #[allow(unused)]
+            pub fn name_of(code: $typ) -> &'static str {
+                match code {
+                    $($cname => stringify!($cname), )*
+                    _ => "no name"
+                }
+            }
+        }
+    };
 }
-pub mod reg_code {
-    pub const RAX: u8 = 0;
-    pub const RCX: u8 = 1;
-    pub const RDX: u8 = 2;
-    pub const RBX: u8 = 3;
-    pub const RSP: u8 = 4;
-    pub const RBP: u8 = 5;
-    pub const RSI: u8 = 6;
-    pub const RDI: u8 = 7;
-    pub const R8: u8 = 8;
-    pub const R9: u8 = 9;
-    pub const R10: u8 = 0xa;
-    pub const R11: u8 = 0xb;
-    pub const R12: u8 = 0xc;
-    pub const R13: u8 = 0xd;
-    pub const R14: u8 = 0xe;
-    pub const RNONE: u8 = 0xf;
+
+define_code!{
+    @mod inst_code;
+    @type u8;
+    HALT = 0x0;
+    NOP = 0x1;
+    CMOVX = 0x2;
+    IRMOVQ = 0x3;
+    RMMOVQ = 0x4;
+    MRMOVQ = 0x5;
+    OPQ = 0x6;
+    JX = 0x7;
+    CALL = 0x8;
+    RET = 0x9;
+    PUSHQ = 0xa;
+    POPQ = 0xb;
+}
+
+define_code!{
+    @mod reg_code;
+    @type u8;
+    RAX = 0;
+    RCX = 1;
+    RDX = 2;
+    RBX = 3;
+    RSP = 4;
+    RBP = 5;
+    RSI = 6;
+    RDI = 7;
+    R8 = 8;
+    R9 = 9;
+    R10 = 0xa;
+    R11 = 0xb;
+    R12 = 0xc;
+    R13 = 0xd;
+    R14 = 0xe;
+    RNONE = 0xf;
 }
 
 pub mod op_code {

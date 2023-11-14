@@ -11,6 +11,7 @@ name = "yas"
 path = "src/bin/yas.rs"
 
 [dependencies]
+ansi_term = "0.12.1"
 anyhow = "1.0.75"
 clap = { version = "4.4.8", features = ["derive"] }
 pest = "2.7.5"

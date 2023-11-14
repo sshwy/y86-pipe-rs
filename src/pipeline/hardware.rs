@@ -2,10 +2,12 @@
 
 use std::cell::RefCell;
 
+use super::Pipeline;
 use super::Stat;
 use crate::isa::cond_fn::*;
 use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
+use crate::isa::reg_code;
 use crate::isa::reg_code::*;
 use crate::{
     define_devices,
@@ -15,7 +17,7 @@ use crate::{
 define_devices! {
     // stage registers and default values for bubble status
 
-    /// Fetch stage
+    /// Fetch stage registers.
     /// note that it's not possible to bubble (see hcl)
     Fstage f {
         .input(stall: bool, bubble: bool)
@@ -71,6 +73,8 @@ define_devices! {
             *rb = ra_rb & 0xf;
             &align[1..9]
         } else {
+            *ra = RNONE;
+            *rb = RNONE;
             &align[0..8]
         };
         *valc = get_u64(rest)
@@ -80,7 +84,7 @@ define_devices! {
         .input(need_valc: bool, need_regids: bool, old_pc: u64)
         .output(new_pc: u64)
     } {
-        let mut x = old_pc;
+        let mut x = old_pc + 1;
         if need_regids { x += 1; }
         if need_valc { x += 8; }
         *new_pc = x;
@@ -98,9 +102,11 @@ define_devices! {
             *valb = state[srcb as usize];
         }
         if dste != RNONE {
+            eprintln!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
             state[dste as usize] = vale;
         }
         if dstm != RNONE {
+            eprintln!("write back fron m: dstm = {}, valm = {:#x}", reg_code::name_of(dstm), valm);
             state[dstm as usize] = valm;
         }
     }
@@ -109,13 +115,15 @@ define_devices! {
         .input(a: u64, b: u64, fun: u8)
         .output(e: u64)
     } {
+        eprintln!("alu: fun = {}", fun);
         *e = match fun {
-            ADD => a + b,
-            SUB => a - b,
-            AND => a & b,
-            XOR => a ^ b,
+            ADD => b.wrapping_add(a),
+            SUB => b.wrapping_sub(a),
+            AND => b & a,
+            XOR => b ^ a,
             _ => 0,
         };
+        eprintln!("alu: a = {:#x}, b = {:#x}, e = {:#x}", a, b, e);
     }
 
     ConditionCode cc {
@@ -128,7 +136,10 @@ define_devices! {
         let cur_sf = (e >> 31 & 1) != 0;
         let cur_zf = e == 0;
         let cur_of = match opfun {
-            ADD | SUB => (((a ^ e) & !(a ^ b)) >> 31 & 1) != 0,
+            // a, b have the same sign and a, e have different sign
+            ADD => (!(a ^ b) & (a ^ e)) >> 31 != 0, 
+            // (b - a): a, b have different sign and b, e have different sign
+            SUB => ((a ^ b) & (b ^ e)) >> 31 != 0,
             _ => false
         };
         if set_cc {
@@ -139,6 +150,7 @@ define_devices! {
         *sf = *s_sf;
         *of = *s_of;
         *zf = *s_zf;
+        eprintln!("a = {:#x}, b = {:#x}, e = {:#x}, sf = {sf}, of = {of}, zf = {zf}", a, b, e);
     }
 
     Condition cond {
@@ -169,6 +181,7 @@ define_devices! {
         }
         *error = false;
         if write {
+            eprintln!("write memory: addr = {:#x}, datain = {:#x}", addr, datain);
             let section: &mut [u8] = &mut binary.borrow_mut()[(addr as usize)..];
             put_u64(section, datain);
             *dataout = 0;
@@ -202,6 +215,60 @@ impl Default for Devices {
             dmem: DataMemory {
                 binary: [0; BIN_SIZE].into(),
             },
+        }
+    }
+}
+
+impl Devices {
+    fn init(bin: [u8; BIN_SIZE]) -> Self {
+        let cell = RefCell::new(bin);
+        Self {
+            f: Fstage {},
+            d: Dstage {},
+            e: Estage {},
+            m: Mstage {},
+            w: Wstage {},
+            imem: InstructionMemory {
+                binary: cell.clone(),
+            },
+            ialign: Align {},
+            pc_inc: PCIncrement {},
+            reg_file: RegisterFile { state: [0; 16] },
+            alu: ArithmetcLogicUnit {},
+            cc: ConditionCode {
+                s_sf: false,
+                s_of: false,
+                s_zf: false,
+            },
+            cond: Condition {},
+            dmem: DataMemory { binary: cell },
+        }
+    }
+    pub fn mem(&self) -> [u8; BIN_SIZE] {
+        self.dmem.binary.borrow().clone()
+    }
+    pub fn print_reg(&self) -> String {
+        return format!("%rax {rax:#018x} %rbx {rbx:#018x} %rcx {rcx:#018x} %rdx {rdx:#018x}\n%rsi {rsi:#018x} %rdi {rdi:#018x} %rsp {rsp:#018x} %rbp {rbp:#018x}",
+            rax = self.reg_file.state[RAX as usize],
+            rbx = self.reg_file.state[RBX as usize],
+            rcx = self.reg_file.state[RCX as usize],
+            rdx = self.reg_file.state[RDX as usize],
+            rsi = self.reg_file.state[RSI as usize],
+            rdi = self.reg_file.state[RDI as usize],
+            rsp = self.reg_file.state[RSP as usize],
+            rbp = self.reg_file.state[RBP as usize],
+        );
+    }
+}
+
+impl<Sigs: Default> Pipeline<Sigs, Devices> {
+    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
+        let devices = Devices::init(bin);
+        Self {
+            order: None,
+            runtime_signals: Sigs::default(),
+            devices,
+            terminate: false,
         }
     }
 }

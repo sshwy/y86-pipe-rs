@@ -30,10 +30,18 @@ macro_rules! define_devices {
         pub mod dev_sig_out {
             #![allow(unused_imports)]
             use super::*;
-            $(#[derive(Default, Debug, Clone)]
+            $(#[derive(Debug, Clone)]
             pub struct $dev_name {
                 $($(pub $oname: $otype, )*)?
                 $($(pub $pname: $ptype, )*)?
+            }
+            impl Default for $dev_name { // initialized as bubble status
+                fn default() -> Self {
+                    Self {
+                        $($($oname: Default::default(), )*)?
+                        $($($pname: $pdefault, )*)?
+                    }
+                }
             })*
         }
         // pub mod dev_pass {
@@ -94,23 +102,27 @@ macro_rules! define_devices {
                 $(
                     if inputs.bubble {
                         $( outputs.$pname = $pdefault; )*
+                        if inputs.stall {
+                            panic!("bubble and stall at the same time")
+                        }
                     } else if !inputs.stall {
                         $( outputs.$pname = inputs.$pname; )*
-                    } else {
-                        panic!("bubble and stall at the same time")
+                    } else { // stall
+                        // do nothing
                     }
                 )?
                 // $( let $pvar = dev_pass::$dev_name::load_default(); )?
 
                 $($body)?
             }
-        } )*
-        $( impl Device for $dev_name {
+        } 
+        impl Device for $dev_name {
             #[allow(unused)]
             fn run(&mut self, (input, output): (DeviceInputSignal, &mut DeviceOutputSignal)) {
                 $dev_name::trigger(self, input.$dev_short_name, &mut output.$dev_short_name)
             }
-        } )*
+        }
+        )*
 
         pub struct Devices {
             $( $dev_short_name: $dev_name, )*
@@ -178,14 +190,21 @@ macro_rules! hcl {
         }
 
         use $hardware::*;
+        use $crate::record::NameList;
+
+        #[allow(unused)]
+        pub type Signals = (DeviceInputSignal, DeviceOutputSignal, IntermediateSignal);
+
+impl $crate::pipeline::Pipeline<Signals, Devices> {
         #[allow(unused)]
         #[allow(non_snake_case)]
-        pub fn update(
+        fn update(
             $inter: &mut IntermediateSignal,
             $nex: &mut DeviceInputSignal,
             $cur: DeviceOutputSignal,
             devices: &mut Devices,
-        ) -> (DeviceOutputSignal, $crate::record::TransLog) {
+            preserved_order: Option<NameList>,
+        ) -> (DeviceOutputSignal, $crate::record::TransLog, NameList) {
             use $crate::isa::inst_code::*;
             use $crate::isa::reg_code::*;
             use $crate::isa::op_code::*;
@@ -241,11 +260,14 @@ macro_rules! hcl {
                 $( rcd.add_rev_deps(stringify!( $oname ), stringify!( $to )); )*
             )*
 
-            let mut rcd = rcd.build($nex, $cur, $inter);
+            // static PRESERVED_ORDER: std::cell::RefCell<> = None.into();
+
+
+            let mut rcd = rcd.build($nex, $cur, $inter, preserved_order);
 
             let order = rcd.toporder();
             let mut logs = Vec::new();
-            for (is_device, name) in order {
+            for (is_device, name) in order.clone() {
                 if is_device {
                     let (mut devin, mut devout) = rcd.clone_devsigs();
                     devices.run_name(name, (devin, &mut devout));
@@ -255,8 +277,10 @@ macro_rules! hcl {
                 }
             }
             // todo: register execution, status handling
-            (rcd.clone_devsigs().1, logs)
+            (rcd.clone_devsigs().1, logs, order)
         }
+
+}
     };
 }
 
