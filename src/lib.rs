@@ -5,6 +5,9 @@ mod pipeline;
 mod record;
 mod utils;
 
+#[cfg(feature = "webapp")]
+mod webapp;
+
 pub use asm::assemble;
 pub use asm::AssembleOption;
 pub type Pipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Devices>;
@@ -262,9 +265,6 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
                 )?
                 $( rcd.add_rev_deps(stringify!( $oname ), stringify!( $to )); )*
             )*
-
-            // static PRESERVED_ORDER: std::cell::RefCell<> = None.into();
-
 
             let mut rcd = rcd.build($nex, $cur, $inter);
 
