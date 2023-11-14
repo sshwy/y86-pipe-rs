@@ -22,10 +22,11 @@ pub struct RecordBuilder<'a, DevIn, DevOut, Inter> {
     updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
     output_prefix: &'static str,
     input_prefix: &'static str,
+    preserved_order: Option<NameList>
 }
 
 impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, Inter> {
-    pub fn new(output_prefix: &'static str, input_prefix: &'static str) -> Self {
+    pub fn new(output_prefix: &'static str, input_prefix: &'static str, preserved_order: Option<NameList>) -> Self {
         Self {
             nodes: Default::default(),
             runnable_nodes: Default::default(),
@@ -38,30 +39,49 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             updates: Default::default(),
             output_prefix,
             input_prefix,
+            preserved_order,
         }
     }
     pub fn add_pass_output(&mut self, origin: &'static str, abbr: &'static str) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.abbrs.push((origin, abbr));
     }
     fn add_edge(&mut self, from: String, to: String) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.nodes.insert(from.clone());
         self.nodes.insert(to.clone());
         self.edges.push((from, to));
     }
     pub fn add_rev_deps(&mut self, name: &'static str, body: &'static str) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.rev_deps.push((name.to_string(), body.to_string()))
     }
     pub fn add_device_node(&mut self, dev_name: &'static str) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.runnable_nodes.push((true, dev_name));
         self.device_nodes.push(dev_name.to_string());
     }
     pub fn add_device_input(&mut self, dev_name: &'static str, field_name: &'static str) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.add_edge(
             dev_name.to_string() + "." + field_name,
             dev_name.to_string(),
         );
     }
     pub fn add_device_output(&mut self, dev_name: &'static str, field_name: &'static str) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.add_edge(
             dev_name.to_string(),
             dev_name.to_string() + "." + field_name,
@@ -70,6 +90,9 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
     // pass means compute next input data from the current output data
     // these device should be run at the end
     pub fn add_device_pass(&mut self, dev_name: &'static str, field_name: &'static str) {
+        if self.preserved_order.is_some() {
+            return
+        }
         self.nodes
             .insert(String::from(self.output_prefix) + "." + dev_name + "." + field_name);
         self.nodes
@@ -189,13 +212,17 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
         devin: &'a mut DevIn,
         devout: DevOut,
         context: &'a mut Inter,
-        preserved_order: Option<NameList>,
     ) -> Record<'a, DevIn, DevOut, Inter> {
+        let order = if let Some(order) = self.preserved_order {
+            order
+        } else {
+            self.toporder()
+        };
         Record {
             devin,
             devout,
             context,
-            order: preserved_order.unwrap_or_else(|| self.toporder()),
+            order,
             updates: self.updates,
         }
     }
@@ -236,7 +263,7 @@ mod tests {
     fn test() {
         let mut a = 0u64;
         let mut x = ();
-        let mut rcd = RecordBuilder::new("o", "i");
+        let mut rcd = RecordBuilder::new("o", "i", None);
         let b = 2u64;
         let mut updater = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
             *a = b;
@@ -247,7 +274,7 @@ mod tests {
         let mut logs = Vec::new();
         rcd.add_update("test", "", &mut updater);
         rcd.add_update("test2", "", &mut updater2);
-        let mut rcd = rcd.build(&mut x, (), &mut a, None);
+        let mut rcd = rcd.build(&mut x, (), &mut a);
         rcd.run_name("test", &mut logs);
         rcd.run_name("test2", &mut logs);
         println!("a = {}, b = {}", a, b);
