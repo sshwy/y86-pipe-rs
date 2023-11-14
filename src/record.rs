@@ -2,13 +2,15 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use regex::Regex;
 
+/// Vec<(is_device, name)>
+pub type NameList = Vec<(bool, &'static str)>;
 pub type TransLog = Vec<(&'static str, &'static str)>;
 // return (receiver, producier)
 pub type Updater<'a, DevIn, DevOut, Inter> =
     Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut)>;
 
 pub struct RecordBuilder<'a, DevIn, DevOut, Inter> {
-    runnable_nodes: Vec<(bool, &'static str)>,
+    runnable_nodes: NameList,
     device_nodes: Vec<String>,
     nodes: BTreeSet<String>,
     edges: Vec<(String, String)>,
@@ -72,6 +74,11 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             .insert(String::from(self.output_prefix) + "." + dev_name + "." + field_name);
         self.nodes
             .insert(String::from(self.input_prefix) + "." + dev_name + "." + field_name);
+        // link input to device, without output
+        self.add_edge(
+            String::from(self.input_prefix) + "." + dev_name + "." + field_name,
+            dev_name.to_string(),
+        );
         self.passed_devices.insert(dev_name);
     }
     /// body: dependency
@@ -121,8 +128,7 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             self.add_edge(from, to)
         }
     }
-    // return Vec<(is_device, name)>
-    pub fn toporder(&mut self) -> Vec<(bool, &'static str)> {
+    pub fn toporder(&mut self) -> NameList {
         self.init_deps();
 
         let mut degree: HashMap<String, i32> = HashMap::default();
@@ -144,16 +150,21 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             if let Some(rnode) = self.runnable_nodes.iter().find(|(_, p)| p == head) {
                 order.push(*rnode);
             }
+            let mut is_depended = false;
             for (from, to) in &self.edges {
                 // make sure stage registers are not depended
                 assert!(!self.passed_devices.contains(from.as_str()));
                 if from == head {
+                    is_depended = true;
                     let entry = degree.get_mut(to).unwrap();
                     *entry -= 1;
                     if *entry == 0 {
                         que.push_back(to);
                     }
                 }
+            }
+            if !is_depended {
+                eprintln!("not depended: {}", head)
             }
         }
 
@@ -163,7 +174,7 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             panic!("not DAG, degrees: {:?}", degree)
         }
 
-        let (mut last, mut order): (Vec<(bool, &'static str)>, Vec<(bool, &'static str)>) = order
+        let (mut last, mut order): (NameList, _) = order
             .into_iter()
             .partition(|o| o.0 && self.passed_devices.contains(o.1));
 
@@ -178,12 +189,13 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
         devin: &'a mut DevIn,
         devout: DevOut,
         context: &'a mut Inter,
+        preserved_order: Option<NameList>,
     ) -> Record<'a, DevIn, DevOut, Inter> {
         Record {
             devin,
             devout,
             context,
-            order: self.toporder(),
+            order: preserved_order.unwrap_or_else(|| self.toporder()),
             updates: self.updates,
         }
     }
@@ -193,7 +205,7 @@ pub struct Record<'a, DevIn, DevOut, Inter> {
     devin: &'a mut DevIn,
     context: &'a mut Inter,
     devout: DevOut,
-    order: Vec<(bool, &'static str)>,
+    order: NameList,
     updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
 }
 
@@ -211,7 +223,7 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
     pub fn update_devout(&mut self, devout: DevOut) {
         self.devout = devout
     }
-    pub fn toporder(&self) -> Vec<(bool, &'static str)> {
+    pub fn toporder(&self) -> NameList {
         self.order.clone()
     }
 }
@@ -235,7 +247,7 @@ mod tests {
         let mut logs = Vec::new();
         rcd.add_update("test", "", &mut updater);
         rcd.add_update("test2", "", &mut updater2);
-        let mut rcd = rcd.build(&mut x, (), &mut a);
+        let mut rcd = rcd.build(&mut x, (), &mut a, None);
         rcd.run_name("test", &mut logs);
         rcd.run_name("test2", &mut logs);
         println!("a = {}, b = {}", a, b);

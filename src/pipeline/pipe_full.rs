@@ -1,4 +1,6 @@
-use crate::hcl;
+use crate::{hcl, record::TransLog, object::BIN_SIZE};
+
+use super::Pipeline;
 
 hcl! {
 
@@ -294,19 +296,140 @@ w_stall bool := mtc(W.stat, [Stat::Adr, Stat::Ins, Stat::Hlt]) => i.w.stall;
 w_bubble bool := false => i.w.bubble;
 }
 
+impl Pipeline<Signals, Devices> {
+    pub fn step(&mut self) -> TransLog {
+        println!("{:=^60}", " Run Cycle ");
+        let (devout, log, order) = Self::update(
+            &mut self.runtime_signals.2,
+            &mut self.runtime_signals.0,
+            self.runtime_signals.1.clone(),
+            &mut self.devices,
+            self.order.take(),
+        );
+        // for stage regitsers (compute for next):
+        // - current info in this cycle: self.runtime_signals.1
+        // - next cycle info: devout
+        // for other devices (compute for current):
+        // - current info in this cycle: devout
+        // combinatorial logics: 
+        // - current self.runtime_signals.2
+        let DeviceOutputSignal {
+            f,
+            d,
+            e,
+            m,
+            w,
+            imem,
+            ialign,
+            pc_inc,
+            reg_file,
+            alu,
+            cc,
+            cond,
+            dmem,
+        } = devout;
+        self.runtime_signals.1.imem = imem;
+        self.runtime_signals.1.ialign = ialign;
+        self.runtime_signals.1.pc_inc = pc_inc;
+        self.runtime_signals.1.reg_file = reg_file;
+        self.runtime_signals.1.alu = alu;
+        self.runtime_signals.1.cc = cc;
+        self.runtime_signals.1.cond = cond;
+        self.runtime_signals.1.dmem = dmem;
+
+        self.print_state();
+        let stat = self.runtime_signals.2.prog_stat;
+        if stat != Stat::Aok && stat != Stat::Bub {
+            self.terminate = true;
+            eprintln!("terminate!");
+        } else { // prepare for the next cycle
+            self.runtime_signals.1.f = f;
+            self.runtime_signals.1.d = d;
+            self.runtime_signals.1.e = e;
+            self.runtime_signals.1.m = m;
+            self.runtime_signals.1.w = w;
+        }
+
+        // pass the computed toporder
+        self.order = Some(order);
+        log
+    }
+
+    pub fn mem(&self) -> [u8; BIN_SIZE] {
+        self.devices.mem()
+    }
+}
+
+#[rustfmt::skip]
+mod nofmt {
+
+use crate::isa::{inst_code, reg_code};
+use ansi_term::Colour::{Red, Green};
+
+use super::*;
+impl Pipeline<Signals, Devices> {
+    // print state at the beginning of a cycle
+    pub fn print_state(&self) {
+        // For stage registers, outputs contains information for the following cycle
+        let (i, o, c) = &self.runtime_signals;
+        println!(
+
+r#"{summary:=^60}
+Stat    F {fstat:?}    D {dstat:?}    E {estat:?}    M {mstat:?}    W {wstat:?}
+icode   f {ficode:6} D {dicode:6} E {eicode:6} M {micode:6} W {wicode:6}
+Control F {fctrl:6} D {dctrl:6} E {ectrl:6} M {mctrl:6} W {wctrl:6}
+f_pc {f_pc:#x} e_dste {e_dste} D_ra {d_ra} D_rb {d_rb}
+{regs}"#, 
+
+summary = " Summary ",
+fstat = Stat::Aok,
+dstat = o.d.stat,
+estat = o.e.stat,
+mstat = o.m.stat,
+wstat = o.w.stat,
+// stage control at the end of the last cycle
+fctrl = if i.f.bubble { Red.bold().paint("Bubble") } else if i.f.stall { Red.bold().paint("Stall ") } else { Green.paint("Normal") },
+dctrl = if i.d.bubble { Red.bold().paint("Bubble") } else if i.d.stall { Red.bold().paint("Stall ") } else { Green.paint("Normal") },
+ectrl = if i.e.bubble { Red.bold().paint("Bubble") } else if i.e.stall { Red.bold().paint("Stall ") } else { Green.paint("Normal") },
+mctrl = if i.m.bubble { Red.bold().paint("Bubble") } else if i.m.stall { Red.bold().paint("Stall ") } else { Green.paint("Normal") },
+wctrl = if i.w.bubble { Red.bold().paint("Bubble") } else if i.w.stall { Red.bold().paint("Stall ") } else { Green.paint("Normal") },
+// ficode is actually computed value
+ficode = inst_code::name_of(i.d.icode),
+dicode = inst_code::name_of(o.d.icode),
+eicode = inst_code::name_of(o.e.icode),
+micode = inst_code::name_of(o.m.icode),
+wicode = inst_code::name_of(o.w.icode),
+f_pc = c.f_pc, e_dste = reg_code::name_of(c.e_dste),
+d_ra = reg_code::name_of(o.d.ra), d_rb = reg_code::name_of(o.d.rb),
+regs = self.devices.print_reg()
+);
+    }
+}
+
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::pipeline::hardware::{DeviceInputSignal, DeviceOutputSignal, Devices};
-
-    use super::{update, IntermediateSignal};
+    use crate::{
+        assemble,
+        pipeline::{hardware::Devices, pipe_full::Signals, Pipeline}, object::{mem_diff, mem_print}, asm::tests::RSUM_YS,
+    };
 
     #[test]
     fn test_hcl() {
-        let mut inter = IntermediateSignal::default();
-        let mut devin = DeviceInputSignal::default();
-        let devout = DeviceOutputSignal::default();
-        let mut devices = Devices::default();
-        let out = update(&mut inter, &mut devin, devout, &mut devices);
-        eprintln!("{:?}", out);
+        // let test_ys = include_str!("../../bubble.ys");
+        let r = assemble(RSUM_YS, crate::AssembleOption::default()).unwrap();
+
+        eprintln!("{}", r);
+        let mut pipe: Pipeline<Signals, Devices> = Pipeline::init(r.obj.binary.clone());
+        while !pipe.is_terminate() {
+            let out = pipe.step();
+            // mem_print(&pipe.mem());
+            eprintln!("{:?}\n", out);
+        }
+
+        mem_diff(&r.obj.binary, &pipe.mem());
+        // mem_print(&pipe.mem());
+        eprintln!("{}", r);
     }
 }
