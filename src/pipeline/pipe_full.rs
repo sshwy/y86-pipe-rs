@@ -1,4 +1,4 @@
-use crate::{hcl, record::TransLog, object::BIN_SIZE};
+use crate::{hcl, object::BIN_SIZE, record::TransLog};
 
 use super::Pipeline;
 
@@ -311,7 +311,7 @@ impl Pipeline<Signals, Devices> {
         // - next cycle info: devout
         // for other devices (compute for current):
         // - current info in this cycle: devout
-        // combinatorial logics: 
+        // combinatorial logics:
         // - current self.runtime_signals.2
         let DeviceOutputSignal {
             f,
@@ -342,7 +342,8 @@ impl Pipeline<Signals, Devices> {
         if stat != Stat::Aok && stat != Stat::Bub {
             self.terminate = true;
             eprintln!("terminate!");
-        } else { // prepare for the next cycle
+        } else {
+            // prepare for the next cycle
             self.runtime_signals.1.f = f;
             self.runtime_signals.1.d = d;
             self.runtime_signals.1.e = e;
@@ -411,8 +412,10 @@ regs = self.devices.print_reg()
 #[cfg(test)]
 mod tests {
     use crate::{
+        asm::tests::RSUM_YS,
         assemble,
-        pipeline::{hardware::Devices, pipe_full::Signals, Pipeline}, object::{mem_diff, mem_print}, asm::tests::RSUM_YS,
+        object::mem_diff,
+        pipeline::{hardware::Devices, pipe_full::Signals, Pipeline},
     };
 
     #[test]
