@@ -3,11 +3,12 @@ mod isa;
 mod object;
 mod pipeline;
 mod record;
+mod utils;
 
 pub use asm::assemble;
 pub use asm::AssembleOption;
 pub type Pipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Devices>;
-pub use object::{mem_diff, mem_print};
+pub use utils::{mem_diff, mem_print};
 
 /// this macro helps defining a set of devices composing a CPU
 #[macro_export]
@@ -117,7 +118,7 @@ macro_rules! define_devices {
 
                 $($body)?
             }
-        } 
+        }
         impl Device for $dev_name {
             #[allow(unused)]
             fn run(&mut self, (input, output): (DeviceInputSignal, &mut DeviceOutputSignal)) {
@@ -288,7 +289,7 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{assemble, AssembleOption, object::BIN_SIZE};
+    use crate::{assemble, isa::BIN_SIZE, AssembleOption};
 
     #[test]
     fn test_assemble() {
@@ -298,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_array(){
+    fn test_array() {
         let a: [u8; 65536] = [0; BIN_SIZE];
         let mut b = a;
         let c = a;
