@@ -6,6 +6,8 @@ mod record;
 
 pub use asm::assemble;
 pub use asm::AssembleOption;
+pub type Pipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Devices>;
+pub use object::{mem_diff, mem_print};
 
 /// this macro helps defining a set of devices composing a CPU
 #[macro_export]
@@ -286,12 +288,21 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{assemble, AssembleOption};
+    use crate::{assemble, AssembleOption, object::BIN_SIZE};
 
     #[test]
     fn test_assemble() {
         let r = assemble(crate::asm::tests::RSUM_YS, AssembleOption::default()).unwrap();
         dbg!(&r.source);
         eprintln!("{}", r);
+    }
+
+    #[test]
+    fn test_array(){
+        let a: [u8; 65536] = [0; BIN_SIZE];
+        let mut b = a;
+        let c = a;
+        b[0] = 12;
+        eprintln!("{:?}, {:?}", b[0], c[0]);
     }
 }

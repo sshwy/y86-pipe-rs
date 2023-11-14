@@ -1,6 +1,7 @@
 //! hardware behavior definition
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use super::Pipeline;
 use super::Stat;
@@ -49,7 +50,7 @@ define_devices! {
     InstructionMemory imem { // with split
         .input(pc: u64)
         .output(error: bool, icode: u8, ifun: u8, align: [u8; 9])
-        binary: RefCell<[u8; BIN_SIZE]>
+        binary: Rc<RefCell<[u8; BIN_SIZE]>>
     } {
         let binary: &[u8; BIN_SIZE] = &binary.borrow();
         if pc + 10 > BIN_SIZE as u64 {
@@ -172,7 +173,7 @@ define_devices! {
     DataMemory dmem {
         .input(addr: u64, datain: u64, read: bool, write: bool)
         .output(dataout: u64, error: bool)
-        binary: RefCell<[u8; BIN_SIZE]>
+        binary: Rc<RefCell<[u8; BIN_SIZE]>>
     } {
         if addr + 8 >= BIN_SIZE as u64 {
             *dataout = 0;
@@ -191,37 +192,9 @@ define_devices! {
     }
 }
 
-impl Default for Devices {
-    fn default() -> Self {
-        Self {
-            f: Fstage {},
-            d: Dstage {},
-            e: Estage {},
-            m: Mstage {},
-            w: Wstage {},
-            imem: InstructionMemory {
-                binary: [0; BIN_SIZE].into(),
-            },
-            ialign: Align {},
-            pc_inc: PCIncrement {},
-            reg_file: RegisterFile { state: [0; 16] },
-            alu: ArithmetcLogicUnit {},
-            cc: ConditionCode {
-                s_sf: false,
-                s_of: false,
-                s_zf: false,
-            },
-            cond: Condition {},
-            dmem: DataMemory {
-                binary: [0; BIN_SIZE].into(),
-            },
-        }
-    }
-}
-
 impl Devices {
     fn init(bin: [u8; BIN_SIZE]) -> Self {
-        let cell = RefCell::new(bin);
+        let cell = std::rc::Rc::new(RefCell::new(bin));
         Self {
             f: Fstage {},
             d: Dstage {},
@@ -245,10 +218,10 @@ impl Devices {
         }
     }
     pub fn mem(&self) -> [u8; BIN_SIZE] {
-        self.dmem.binary.borrow().clone()
+        *self.dmem.binary.borrow()
     }
     pub fn print_reg(&self) -> String {
-        return format!("%rax {rax:#018x} %rbx {rbx:#018x} %rcx {rcx:#018x} %rdx {rdx:#018x}\n%rsi {rsi:#018x} %rdi {rdi:#018x} %rsp {rsp:#018x} %rbp {rbp:#018x}",
+        format!("%rax {rax:#018x} %rbx {rbx:#018x} %rcx {rcx:#018x} %rdx {rdx:#018x}\n%rsi {rsi:#018x} %rdi {rdi:#018x} %rsp {rsp:#018x} %rbp {rbp:#018x}",
             rax = self.reg_file.state[RAX as usize],
             rbx = self.reg_file.state[RBX as usize],
             rcx = self.reg_file.state[RCX as usize],
@@ -257,7 +230,7 @@ impl Devices {
             rdi = self.reg_file.state[RDI as usize],
             rsp = self.reg_file.state[RSP as usize],
             rbp = self.reg_file.state[RBP as usize],
-        );
+        )
     }
 }
 

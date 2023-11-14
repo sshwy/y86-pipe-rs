@@ -310,7 +310,7 @@ impl Display for ObjectExt {
 pub fn mem_diff(left: &[u8; BIN_SIZE], right: &[u8; BIN_SIZE]) {
     for i in 0..BIN_SIZE >> 3 {
         if get_u64(&left[i << 3..]) != get_u64(&right[i << 3..]) {
-            eprint!("{:#4x}: ", i << 3,);
+            eprint!("{:#06x}: ", i << 3,);
             for byte in left[i << 3..].iter().take(8) {
                 eprint!("{:02x}", *byte)
             }
@@ -318,7 +318,7 @@ pub fn mem_diff(left: &[u8; BIN_SIZE], right: &[u8; BIN_SIZE]) {
             for byte in right[i << 3..].iter().take(8) {
                 eprint!("{:02x}", *byte)
             }
-            eprintln!("")
+            eprintln!()
         }
     }
 }
@@ -335,6 +335,6 @@ pub fn mem_print(bin: &[u8; BIN_SIZE]) {
         for byte in bin[i << 3..].iter().take(8) {
             eprint!("{:02x}", *byte)
         }
-        eprintln!("")
+        eprintln!()
     }
 }
