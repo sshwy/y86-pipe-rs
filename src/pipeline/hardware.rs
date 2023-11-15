@@ -3,7 +3,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::Pipeline;
 use super::Stat;
 use crate::isa::cond_fn::*;
 use crate::isa::inst_code::NOP;
@@ -194,7 +193,7 @@ define_devices! {
 }
 
 impl Devices {
-    fn init(bin: [u8; BIN_SIZE]) -> Self {
+    pub(crate) fn init(bin: [u8; BIN_SIZE]) -> Self {
         let cell = std::rc::Rc::new(RefCell::new(bin));
         Self {
             f: Fstage {},
@@ -218,10 +217,10 @@ impl Devices {
             dmem: DataMemory { binary: cell },
         }
     }
-    pub fn mem(&self) -> [u8; BIN_SIZE] {
+    pub(crate) fn mem(&self) -> [u8; BIN_SIZE] {
         *self.dmem.binary.borrow()
     }
-    pub fn print_reg(&self) -> String {
+    pub(crate) fn print_reg(&self) -> String {
         format!("%rax {rax:#018x} %rbx {rbx:#018x} %rcx {rcx:#018x} %rdx {rdx:#018x}\n%rsi {rsi:#018x} %rdi {rdi:#018x} %rsp {rsp:#018x} %rbp {rbp:#018x}",
             rax = self.reg_file.state[RAX as usize],
             rbx = self.reg_file.state[RBX as usize],
@@ -232,17 +231,5 @@ impl Devices {
             rsp = self.reg_file.state[RSP as usize],
             rbp = self.reg_file.state[RBP as usize],
         )
-    }
-}
-
-impl<Sigs: Default> Pipeline<Sigs, Devices> {
-    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
-        let devices = Devices::init(bin);
-        Self {
-            order: None,
-            runtime_signals: Sigs::default(),
-            devices,
-            terminate: false,
-        }
     }
 }

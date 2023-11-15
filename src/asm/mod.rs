@@ -111,13 +111,13 @@ impl From<&str> for CondFn {
 
 impl From<&str> for OpFn {
     fn from(value: &str) -> Self {
-        if value.starts_with("andq") {
+        if value.contains("andq") {
             Self::AND
-        } else if value.starts_with("addq") {
+        } else if value.contains("addq") {
             Self::ADD
-        } else if value.starts_with("subq") {
+        } else if value.contains("subq") {
             Self::SUB
-        } else if value.starts_with("xorq") {
+        } else if value.contains("xorq") {
             Self::XOR
         } else {
             panic!("invalid")
@@ -205,7 +205,7 @@ pub enum Inst<ImmType: Clone> {
     RET,
     PUSHQ(Reg),
     POPQ(Reg),
-    IOPQ(ImmType, Reg),
+    IOPQ(OpFn, ImmType, Reg),
 }
 
 impl<ImmType: Clone> Inst<ImmType> {
@@ -216,7 +216,7 @@ impl<ImmType: Clone> Inst<ImmType> {
             OPQ(_, _, _) | CMOVX(_, _, _) | PUSHQ(_) | POPQ(_) => 2,
             JX(_, _) | CALL(_) => 9,
             IRMOVQ(_, _) | RMMOVQ(_, _) | MRMOVQ(_, _) => 10,
-            IOPQ(_, _) => todo!(),
+            IOPQ(_, _, _) => 10,
         }
     }
     pub fn icode(&self) -> u8 {
@@ -234,7 +234,7 @@ impl<ImmType: Clone> Inst<ImmType> {
             Inst::RET => RET,
             Inst::PUSHQ(_) => PUSHQ,
             Inst::POPQ(_) => POPQ,
-            Inst::IOPQ(_, _) => todo!(),
+            Inst::IOPQ(_, _, _) => todo!(),
         }
     }
 }
@@ -322,7 +322,12 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     src_info.inst = Some(Inst::OPQ(op_fn, reg_a, reg_b));
                     cur_addr += 2
                 }
-                Rule::i_iopq => todo!(),
+                Rule::i_iopq => {
+                    let imm = Imm::from(it.next().unwrap());
+                    let reg = Reg::from(it.next().unwrap());
+                    let op_fn = OpFn::from(pair2.as_str());
+                    src_info.inst = Some(Inst::IOPQ(op_fn, imm,  reg));
+                },
                 Rule::i_jx => {
                     let cond_fn = CondFn::from(it.next().unwrap().as_str());
                     let imm = Imm::from(it.next().unwrap());
