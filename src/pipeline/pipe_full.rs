@@ -299,12 +299,12 @@ w_bubble bool := false => i.w.bubble;
 impl Pipeline<Signals, Devices> {
     pub fn step(&mut self) -> (Signals, TransLog) {
         println!("{:=^60}", " Run Cycle ");
-        let (devout, log, order) = Self::update(
+        let (devout, log) = Self::update(
             &mut self.runtime_signals.2,
             &mut self.runtime_signals.0,
             self.runtime_signals.1.clone(),
             &mut self.devices,
-            self.order.take(),
+            &self.graph.order,
         );
         // for stage regitsers (compute for next):
         // - current info in this cycle: self.runtime_signals.1
@@ -354,8 +354,6 @@ impl Pipeline<Signals, Devices> {
             self.runtime_signals.1.w = w;
         }
 
-        // pass the computed toporder
-        self.order = Some(order);
         (saved_state, log)
     }
 
@@ -410,6 +408,18 @@ regs = self.devices.print_reg()
     }
 }
 
+}
+
+impl<Sigs: Default> Pipeline<Sigs, Devices> {
+    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
+        let devices = Devices::init(bin);
+        Self {
+            graph: Pipeline::build_graph(),
+            runtime_signals: Sigs::default(),
+            devices,
+            terminate: false,
+        }
+    }
 }
 
 #[cfg(test)]

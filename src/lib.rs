@@ -145,7 +145,7 @@ macro_rules! define_devices {
             }
         }
 
-        pub fn hardware_setup<T>(rcd: &mut $crate::record::RecordBuilder<'_, DeviceInputSignal, DeviceOutputSignal, T>) {
+        pub fn hardware_setup(rcd: &mut $crate::record::GraphBuilder) {
             $(
                rcd.add_device_node(stringify!($dev_short_name));
                $( $( rcd.add_device_input(stringify!($dev_short_name), stringify!($iname)); )* )?
@@ -202,6 +202,36 @@ macro_rules! hcl {
         pub type Signals = (DeviceInputSignal, DeviceOutputSignal, IntermediateSignal);
 
 impl $crate::pipeline::Pipeline<Signals, Devices> {
+        fn build_graph() -> $crate::record::Graph {
+            let mut g = $crate::record::GraphBuilder::new(stringify!($cur), stringify!($nex));
+            g.add_pass_output(concat!(stringify!($cur), ".f"), stringify!($fstage));
+            g.add_pass_output(concat!(stringify!($cur), ".d"), stringify!($dstage));
+            g.add_pass_output(concat!(stringify!($cur), ".e"), stringify!($estage));
+            g.add_pass_output(concat!(stringify!($cur), ".m"), stringify!($mstage));
+            g.add_pass_output(concat!(stringify!($cur), ".w"), stringify!($wstage));
+
+            // hardware setup
+            hardware_setup(&mut g);
+
+            $(
+                $(
+                    g.add_update(
+                        stringify!($oname), concat!($( concat!(
+                            stringify!($cond), ";",
+                            stringify!($val), ";",
+                        ) ),*),
+                    );
+                )?
+                $(
+                    g.add_update(
+                        stringify!($oname), stringify!($final),
+                    );
+                )?
+                $( g.add_rev_deps(stringify!( $oname ), stringify!( $to )); )*
+            )*
+
+            g.build()
+        }
         #[allow(unused)]
         #[allow(non_snake_case)]
         fn update(
@@ -209,8 +239,8 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
             $nex: &mut DeviceInputSignal,
             $cur: DeviceOutputSignal,
             devices: &mut Devices,
-            preserved_order: Option<NameList>,
-        ) -> (DeviceOutputSignal, $crate::record::TransLog, NameList) {
+            order: &NameList,
+        ) -> (DeviceOutputSignal, $crate::record::TransLog) {
             use $crate::isa::inst_code::*;
             use $crate::isa::reg_code::*;
             use $crate::isa::op_code::*;
@@ -222,15 +252,7 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
             let $mstage = $cur.m.clone();
             let $wstage = $cur.w.clone();
 
-            let mut rcd = $crate::record::RecordBuilder::new(stringify!($cur), stringify!($nex), preserved_order);
-            rcd.add_pass_output(concat!(stringify!($cur), ".f"), stringify!($fstage));
-            rcd.add_pass_output(concat!(stringify!($cur), ".d"), stringify!($dstage));
-            rcd.add_pass_output(concat!(stringify!($cur), ".e"), stringify!($estage));
-            rcd.add_pass_output(concat!(stringify!($cur), ".m"), stringify!($mstage));
-            rcd.add_pass_output(concat!(stringify!($cur), ".w"), stringify!($wstage));
-
-            // hardware setup
-            hardware_setup(&mut rcd);
+            let mut rcd = $crate::record::Record::new($nex, $cur, $inter);
 
             $(
                 let mut $oname = |
@@ -248,30 +270,12 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
                     $( $inter.$oname = $final; )?
                     $( $to = $inter.$oname.to_owned(); )*
                 };
-                $(
-                    rcd.add_update(
-                        stringify!($oname), concat!($( concat!(
-                            stringify!($cond), ";",
-                            stringify!($val), ";",
-                        ) ),*),
-                        &mut $oname
-                    );
-                )?
-                $(
-                    rcd.add_update(
-                        stringify!($oname), stringify!($final),
-                        &mut $oname
-                    );
-                )?
-                $( rcd.add_rev_deps(stringify!( $oname ), stringify!( $to )); )*
+                rcd.add_update(stringify!($oname), &mut $oname);
             )*
 
-            let mut rcd = rcd.build($nex, $cur, $inter);
-
-            let order = rcd.toporder();
             let mut logs = Vec::new();
-            for (is_device, name) in order.clone() {
-                if is_device {
+            for (is_device, name) in order {
+                if *is_device {
                     let (mut devin, mut devout) = rcd.clone_devsigs();
                     devices.run_name(name, (devin, &mut devout));
                     rcd.update_devout(devout)
@@ -280,7 +284,7 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
                 }
             }
             // todo: register execution, status handling
-            (rcd.clone_devsigs().1, logs, order)
+            (rcd.clone_devsigs().1, logs)
         }
 
 }

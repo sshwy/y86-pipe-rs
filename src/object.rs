@@ -30,7 +30,7 @@ impl asm::Inst<asm::Imm> {
             RET => RET,
             PUSHQ(ra) => PUSHQ(*ra),
             POPQ(ra) => POPQ(*ra),
-            IOPQ(_, _) => todo!(),
+            IOPQ(op, imm, reg) => IOPQ(*op, imm.desymbol(sym), *reg),
         }
     }
 }
@@ -92,7 +92,7 @@ impl SourceInfo {
                         obj.binary[addr] = h2!(inst.icode(), 0);
                         obj.binary[addr + 1] = h2!(ra, Reg::RNONE);
                     }
-                    asm::Inst::IOPQ(_, _) => todo!(),
+                    asm::Inst::IOPQ(_, _, _) => todo!(),
                 }
             }
             if let Some((sz, data)) = &self.data {
@@ -103,14 +103,15 @@ impl SourceInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "webapp", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SourceInfo {
-    pub addr: Option<u64>,
-    pub inst: Option<asm::Inst<asm::Imm>>,
-    pub label: Option<String>,
+    pub(crate) addr: Option<u64>,
+    pub(crate) inst: Option<asm::Inst<asm::Imm>>,
+    pub(crate) label: Option<String>,
     // width and data
-    pub data: Option<(u8, asm::Imm)>,
-    pub src: String,
+    pub(crate) data: Option<(u8, asm::Imm)>,
+    pub(crate) src: String,
 }
 
 /// object file

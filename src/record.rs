@@ -9,7 +9,12 @@ pub type TransLog = Vec<(&'static str, &'static str)>;
 pub type Updater<'a, DevIn, DevOut, Inter> =
     Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut)>;
 
-pub struct RecordBuilder<'a, DevIn, DevOut, Inter> {
+pub struct Graph {
+    pub(crate) order: NameList,
+    pub(crate) nodes: BTreeSet<String>,
+    pub(crate) edges: Vec<(String, String)>,
+}
+pub struct GraphBuilder {
     runnable_nodes: NameList,
     device_nodes: Vec<String>,
     nodes: BTreeSet<String>,
@@ -19,18 +24,12 @@ pub struct RecordBuilder<'a, DevIn, DevOut, Inter> {
     rev_deps: Vec<(String, String)>,
     // abbrs for pass output
     abbrs: Vec<(&'static str, &'static str)>,
-    updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
     output_prefix: &'static str,
     input_prefix: &'static str,
-    preserved_order: Option<NameList>,
 }
 
-impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, Inter> {
-    pub fn new(
-        output_prefix: &'static str,
-        input_prefix: &'static str,
-        preserved_order: Option<NameList>,
-    ) -> Self {
+impl GraphBuilder {
+    pub fn new(output_prefix: &'static str, input_prefix: &'static str) -> Self {
         Self {
             nodes: Default::default(),
             runnable_nodes: Default::default(),
@@ -40,52 +39,32 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             edges: Default::default(),
             passed_devices: Default::default(),
             abbrs: Default::default(),
-            updates: Default::default(),
             output_prefix,
             input_prefix,
-            preserved_order,
         }
     }
     pub fn add_pass_output(&mut self, origin: &'static str, abbr: &'static str) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.abbrs.push((origin, abbr));
     }
     fn add_edge(&mut self, from: String, to: String) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.nodes.insert(from.clone());
         self.nodes.insert(to.clone());
         self.edges.push((from, to));
     }
     pub fn add_rev_deps(&mut self, name: &'static str, body: &'static str) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.rev_deps.push((name.to_string(), body.to_string()))
     }
     pub fn add_device_node(&mut self, dev_name: &'static str) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.runnable_nodes.push((true, dev_name));
         self.device_nodes.push(dev_name.to_string());
     }
     pub fn add_device_input(&mut self, dev_name: &'static str, field_name: &'static str) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.add_edge(
             dev_name.to_string() + "." + field_name,
             dev_name.to_string(),
         );
     }
     pub fn add_device_output(&mut self, dev_name: &'static str, field_name: &'static str) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.add_edge(
             dev_name.to_string(),
             dev_name.to_string() + "." + field_name,
@@ -94,9 +73,6 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
     // pass means compute next input data from the current output data
     // these device should be run at the end
     pub fn add_device_pass(&mut self, dev_name: &'static str, field_name: &'static str) {
-        if self.preserved_order.is_some() {
-            return;
-        }
         self.nodes
             .insert(String::from(self.output_prefix) + "." + dev_name + "." + field_name);
         self.nodes
@@ -109,16 +85,10 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
         self.passed_devices.insert(dev_name);
     }
     /// body: dependency
-    pub fn add_update(
-        &mut self,
-        name: &'static str,
-        body: &'static str,
-        func: &'a mut impl FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut),
-    ) {
+    pub fn add_update(&mut self, name: &'static str, body: &'static str) {
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
         self.deps.push((name.to_string(), body.to_string()));
-        self.updates.insert(name, Box::new(func));
     }
     fn replace_abbr(&self, str: &str) -> String {
         let mut r = str.to_string();
@@ -155,7 +125,7 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
             self.add_edge(from, to)
         }
     }
-    pub fn toporder(&mut self) -> NameList {
+    pub fn build(mut self) -> Graph {
         self.init_deps();
 
         let mut degree: HashMap<String, i32> = HashMap::default();
@@ -209,25 +179,12 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> RecordBuilder<'a, DevIn, DevOut, In
         order.append(&mut last);
 
         eprintln!("order: {:?}", &order);
-        order
-    }
-    pub fn build(
-        mut self,
-        devin: &'a mut DevIn,
-        devout: DevOut,
-        context: &'a mut Inter,
-    ) -> Record<'a, DevIn, DevOut, Inter> {
-        let order = if let Some(order) = self.preserved_order {
-            order
-        } else {
-            self.toporder()
-        };
-        Record {
-            devin,
-            devout,
-            context,
+
+        // order
+        Graph {
             order,
-            updates: self.updates,
+            nodes: self.nodes,
+            edges: self.edges,
         }
     }
 }
@@ -236,11 +193,30 @@ pub struct Record<'a, DevIn, DevOut, Inter> {
     devin: &'a mut DevIn,
     context: &'a mut Inter,
     devout: DevOut,
-    order: NameList,
     updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
 }
 
 impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
+    pub fn new(
+        devin: &'a mut DevIn,
+        devout: DevOut,
+        context: &'a mut Inter,
+    ) -> Self {
+        Record {
+            devin,
+            devout,
+            context,
+            updates: Default::default(),
+        }
+    }
+    /// body: dependency
+    pub fn add_update(
+        &mut self,
+        name: &'static str,
+        func: &'a mut impl FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut),
+    ) {
+        self.updates.insert(name, Box::new(func));
+    }
     pub fn run_name(&mut self, name: &'static str, trace: &mut TransLog) {
         if let Some(func) = self.updates.get_mut(name) {
             func(self.devin, self.context, trace, self.devout.clone())
@@ -254,20 +230,17 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
     pub fn update_devout(&mut self, devout: DevOut) {
         self.devout = devout
     }
-    pub fn toporder(&self) -> NameList {
-        self.order.clone()
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::record::{RecordBuilder, TransLog};
+    use crate::record::{GraphBuilder, Record, TransLog};
 
     #[test]
     fn test() {
         let mut a = 0u64;
         let mut x = ();
-        let mut rcd = RecordBuilder::new("o", "i", None);
+        let mut graph = GraphBuilder::new("o", "i");
         let b = 2u64;
         let mut updater = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
             *a = b;
@@ -275,10 +248,13 @@ mod tests {
         let mut updater2 = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
             *a = *a + b;
         };
+        graph.add_update("test", "");
+        graph.add_update("test2", "");
+        let graph = graph.build();
         let mut logs = Vec::new();
-        rcd.add_update("test", "", &mut updater);
-        rcd.add_update("test2", "", &mut updater2);
-        let mut rcd = rcd.build(&mut x, (), &mut a);
+        let mut rcd = Record::new(&mut x, (), &mut a);
+        rcd.add_update("test", &mut updater);
+        rcd.add_update("test2", &mut updater2);
         rcd.run_name("test", &mut logs);
         rcd.run_name("test2", &mut logs);
         println!("a = {}, b = {}", a, b);

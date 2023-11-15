@@ -1,4 +1,4 @@
-use crate::record::NameList;
+use crate::record::Graph;
 
 pub mod hardware;
 pub mod pipe_full;
@@ -25,7 +25,7 @@ impl Default for Stat {
 
 /// pipeline runner
 pub struct Pipeline<Sigs: Default, Devices> {
-    pub(crate) order: Option<NameList>,
+    pub(crate) graph: Graph,
     /// signals are returned after each step, thus set to private
     runtime_signals: Sigs,
     /// devices are not easily made clone, thus it's up to app to decide which information to save.
