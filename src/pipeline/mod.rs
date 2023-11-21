@@ -5,6 +5,8 @@ pub mod pipe_full;
 
 /// Pipeline Pipeline State
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[cfg_attr(feature = "webapp", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "webapp", derive(serde::Serialize))]
 pub enum Stat {
     Aok = 0,
     /// bubble

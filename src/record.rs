@@ -1,18 +1,95 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-
 use regex::Regex;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
+    fmt::Debug,
+    hash::Hash,
+};
 
 /// Vec<(is_device, name)>
 pub type NameList = Vec<(bool, &'static str)>;
-pub type TransLog = Vec<(&'static str, &'static str)>;
+
 // return (receiver, producier)
 pub type Updater<'a, DevIn, DevOut, Inter> =
-    Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut)>;
+    Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter, &mut Tracer, DevOut)>;
 
+#[derive(Debug)]
 pub struct Graph {
+    // pub(crate) levels: Vec<(String, i32)>,
     pub(crate) order: NameList,
-    pub(crate) nodes: BTreeSet<String>,
-    pub(crate) edges: Vec<(String, String)>,
+    // Node format:
+    // - `i.[fdemw].*`: stage register passin node
+    // - `o.[fdemw].*`: stage register passout node
+    // - `*`: intermediate signal node
+    // - `*.*`: regular device input/output node
+    // pub(crate) nodes: Vec<String>,
+    // pub(crate) edges: Vec<(String, String)>,
+}
+
+fn replace_abbr(abbrs: &[(&'static str, &'static str)], str: &str) -> String {
+    let mut r = str.to_string();
+    for (origin, abbr) in abbrs {
+        let re = Regex::new(&format!(r"\b{abbr}\b")).unwrap();
+        r = re.replace_all(&r, *origin).to_string();
+    }
+    r
+}
+// impl Graph {
+// pub(crate) fn get_node_index(&self, name: &str) -> Option<usize> {
+//     let name = replace_abbr(&self.abbrs, name);
+//     let r = self.nodes.iter().position(|u| u.contains(&name));
+//     if r.is_some() {
+//         return r;
+//     }
+//     let r = self.nodes.iter().position(|u| name.contains(u));
+//     if r.is_some() {
+//         return r;
+//     }
+//     // eprintln!("x: {}", name);
+//     r
+// }
+// }
+
+/// compute topological order of nodes
+///
+/// return node list in order and their levels
+pub fn topo<Node: Copy + Eq + Hash + Debug>(
+    nodes: impl Iterator<Item = Node> + Clone,
+    edges: impl Iterator<Item = (Node, Node)> + Clone,
+) -> Vec<(Node, i32)> {
+    let mut degree_level: HashMap<Node, (i32, i32)> = HashMap::default();
+    for (_, to) in edges.clone() {
+        let entry = degree_level.entry(to).or_default();
+        entry.0 += 1;
+    }
+    let mut que: VecDeque<Node> = VecDeque::new();
+    let mut levels = Vec::new();
+    for node in nodes {
+        if degree_level.get(&node).cloned().unwrap_or_default().0 == 0 {
+            que.push_back(node)
+        }
+    }
+    while let Some(head) = que.pop_front() {
+        let level = degree_level.remove(&head).map(|o| o.1).unwrap_or(0);
+        levels.push((head, level));
+        // let mut is_depended = false;
+        for (from, to) in edges.clone() {
+            if from == head {
+                // is_depended = true;
+                let entry = degree_level.get_mut(&to).unwrap();
+                entry.0 -= 1;
+                entry.1 = entry.1.max(level + 1);
+                if entry.0 == 0 {
+                    que.push_back(to);
+                }
+            }
+        }
+    }
+
+    if !degree_level.is_empty() {
+        panic!("not DAG, degrees: {:?}", degree_level)
+    }
+
+    levels
 }
 pub struct GraphBuilder {
     runnable_nodes: NameList,
@@ -59,16 +136,11 @@ impl GraphBuilder {
         self.device_nodes.push(dev_name.to_string());
     }
     pub fn add_device_input(&mut self, dev_name: &'static str, field_name: &'static str) {
-        self.add_edge(
-            dev_name.to_string() + "." + field_name,
-            dev_name.to_string(),
-        );
+        // dbg!(dev_name, field_name);
+        self.add_edge(field_name.to_string(), dev_name.to_string());
     }
     pub fn add_device_output(&mut self, dev_name: &'static str, field_name: &'static str) {
-        self.add_edge(
-            dev_name.to_string(),
-            dev_name.to_string() + "." + field_name,
-        );
+        self.add_edge(dev_name.to_string(), field_name.to_string());
     }
     // pass means compute next input data from the current output data
     // these device should be run at the end
@@ -90,19 +162,10 @@ impl GraphBuilder {
         self.nodes.insert(name.to_string());
         self.deps.push((name.to_string(), body.to_string()));
     }
-    fn replace_abbr(&self, str: &str) -> String {
-        let mut r = str.to_string();
-        for (origin, abbr) in &self.abbrs {
-            let re = Regex::new(&format!(r"\b{abbr}\b")).unwrap();
-            r = re.replace_all(&r, *origin).to_string();
-        }
-        r
-    }
     fn init_deps(&mut self) {
         let mut new_edges = Vec::new();
         for (name, body) in &self.deps {
-            let body = self.replace_abbr(body);
-            // dbg!(&body);
+            let body = replace_abbr(&self.abbrs, body);
             for node in &self.nodes {
                 // edges from device to there inputs/outputs has already bean added
                 // thus is filtered out
@@ -112,7 +175,7 @@ impl GraphBuilder {
             }
         }
         for (name, body) in &self.rev_deps {
-            let body = self.replace_abbr(body);
+            let body = replace_abbr(&self.abbrs, body);
             for node in &self.nodes {
                 // edges from device to there inputs/outputs has already bean added
                 // thus is filtered out
@@ -125,51 +188,15 @@ impl GraphBuilder {
             self.add_edge(from, to)
         }
     }
+    /// compute topological order of nodes
     pub fn build(mut self) -> Graph {
         self.init_deps();
 
-        let mut degree: HashMap<String, i32> = HashMap::default();
-        for (_, to) in &self.edges {
-            *degree.entry(to.to_string()).or_default() += 1;
-        }
-        let mut que = VecDeque::new();
-        for node in &self.nodes {
-            if degree.get(node).cloned().unwrap_or_default() == 0 {
-                if !node.starts_with(self.output_prefix) {
-                    eprintln!("zero degree: {}", node);
-                }
-                que.push_back(node)
-            }
-        }
-        let mut order = Vec::new();
-        while let Some(head) = que.pop_front() {
-            degree.remove(head);
-            if let Some(rnode) = self.runnable_nodes.iter().find(|(_, p)| p == head) {
-                order.push(*rnode);
-            }
-            let mut is_depended = false;
-            for (from, to) in &self.edges {
-                // make sure stage registers are not depended
-                assert!(!self.passed_devices.contains(from.as_str()));
-                if from == head {
-                    is_depended = true;
-                    let entry = degree.get_mut(to).unwrap();
-                    *entry -= 1;
-                    if *entry == 0 {
-                        que.push_back(to);
-                    }
-                }
-            }
-            if !is_depended {
-                eprintln!("not depended: {}", head)
-            }
-        }
-
-        eprintln!("edges: {:?}", &self.edges);
-
-        if !degree.is_empty() {
-            panic!("not DAG, degrees: {:?}", degree)
-        }
+        let levels = topo(self.nodes.iter(), self.edges.iter().map(|(a, b)| (a, b)));
+        let order: Vec<(bool, &'static str)> = levels
+            .iter()
+            .filter_map(|(node, _)| self.runnable_nodes.iter().find(|(_, p)| p == node).copied())
+            .collect();
 
         let (mut last, mut order): (NameList, _) = order
             .into_iter()
@@ -178,14 +205,28 @@ impl GraphBuilder {
         // put passed device (mainly stage registers) at the end
         order.append(&mut last);
 
-        eprintln!("order: {:?}", &order);
+        // eprintln!("order: {:?}", &order);
 
         // order
         Graph {
+            // levels: levels.into_iter().map(|(a, b)| (a.clone(), b)).collect(),
             order,
-            nodes: self.nodes,
-            edges: self.edges,
+            // nodes: self.nodes.into_iter().collect(),
+            // edges: self.edges,
         }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct Tracer {
+    pub(crate) tunnel: Vec<&'static str>,
+}
+impl Tracer {
+    pub fn trigger_tunnel(&mut self, name: &'static str) {
+        if self.tunnel.contains(&name) {
+            return;
+        }
+        self.tunnel.push(name);
     }
 }
 
@@ -194,32 +235,35 @@ pub struct Record<'a, DevIn, DevOut, Inter> {
     context: &'a mut Inter,
     devout: DevOut,
     updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
+    tracer: Tracer,
 }
 
 impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
-    pub fn new(
-        devin: &'a mut DevIn,
-        devout: DevOut,
-        context: &'a mut Inter,
-    ) -> Self {
+    pub fn new(devin: &'a mut DevIn, devout: DevOut, context: &'a mut Inter) -> Self {
         Record {
             devin,
             devout,
             context,
             updates: Default::default(),
+            tracer: Default::default(),
         }
     }
     /// body: dependency
     pub fn add_update(
         &mut self,
         name: &'static str,
-        func: &'a mut impl FnMut(&mut DevIn, &mut Inter, &mut TransLog, DevOut),
+        func: &'a mut impl FnMut(&mut DevIn, &mut Inter, &mut Tracer, DevOut),
     ) {
         self.updates.insert(name, Box::new(func));
     }
-    pub fn run_name(&mut self, name: &'static str, trace: &mut TransLog) {
+    pub fn run_name(&mut self, name: &'static str) {
         if let Some(func) = self.updates.get_mut(name) {
-            func(self.devin, self.context, trace, self.devout.clone())
+            func(
+                self.devin,
+                self.context,
+                &mut self.tracer,
+                self.devout.clone(),
+            )
         } else {
             panic!("invalid name")
         }
@@ -230,33 +274,31 @@ impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
     pub fn update_devout(&mut self, devout: DevOut) {
         self.devout = devout
     }
+    pub fn finalize(self) -> (DevOut, Tracer) {
+        (self.devout, self.tracer)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::record::{GraphBuilder, Record, TransLog};
+    use crate::record::{Record, Tracer};
 
     #[test]
     fn test() {
         let mut a = 0u64;
         let mut x = ();
-        let mut graph = GraphBuilder::new("o", "i");
         let b = 2u64;
-        let mut updater = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
+        let mut updater = |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
             *a = b;
         };
-        let mut updater2 = |_: &mut (), a: &mut u64, _: &mut TransLog, _| {
+        let mut updater2 = |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
             *a = *a + b;
         };
-        graph.add_update("test", "");
-        graph.add_update("test2", "");
-        let graph = graph.build();
-        let mut logs = Vec::new();
         let mut rcd = Record::new(&mut x, (), &mut a);
         rcd.add_update("test", &mut updater);
         rcd.add_update("test2", &mut updater2);
-        rcd.run_name("test", &mut logs);
-        rcd.run_name("test2", &mut logs);
+        rcd.run_name("test");
+        rcd.run_name("test2");
         println!("a = {}, b = {}", a, b);
     }
 }

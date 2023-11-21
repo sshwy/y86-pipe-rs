@@ -1,7 +1,8 @@
-use crate::{hcl, isa::BIN_SIZE, record::TransLog};
+use crate::{hcl, isa::BIN_SIZE, record::Tracer};
 
 use super::Pipeline;
 
+// suffix of tunnel specify its stage
 hcl! {
 
 @hardware crate::pipeline::hardware;
@@ -16,13 +17,13 @@ hcl! {
 
 f_pc u64 = [
     // Mispredicted branch.  Fetch at incremented PC
-    M.icode == JX && !M.cnd => M.vala;
+    M.icode == JX && !M.cnd => M.vala; @f_pc_fw_M_valA_MM
     // Completion of RET instruction
-    W.icode == RET => W.valm;
+    W.icode == RET => W.valm; @f_pc_fw_W_valM_WW
     // Default: Use predicted value of PC
-    1 => F.pred_pc;
-] => i.pc_inc.old_pc
-  => i.imem.pc;
+    1 => F.pred_pc;   @f_pc_F_predPC_FF
+] => i.pc_inc.old_pc, @PC_f_pc_FF
+  => i.imem.pc,       @IM_f_pc_FF;
 
 // Determine icode of fetched instruction
 f_icode u8 = [
@@ -37,8 +38,10 @@ f_ifun u8 = [
 ] => i.d.ifun;
 
 f_align [u8; 9] := o.imem.align => i.ialign.align;
-f_valc u64 := o.ialign.valc => i.d.valc;
-f_valp u64 := o.pc_inc.new_pc => i.d.valp;
+f_valc u64 := o.ialign.valc, @f_valC_D_valC_FF 
+    => i.d.valc;
+f_valp u64 := o.pc_inc.new_pc, @f_valP_D_valP_FF 
+    => i.d.valp;
 f_ra u8 := o.ialign.ra => i.d.ra;
 f_rb u8 := o.ialign.rb => i.d.rb;
 
@@ -67,9 +70,9 @@ need_valc bool
 
 // Predict next value of PC
 f_pred_pc u64 = [
-    mtc(c.f_icode, [JX, CALL]) => c.f_valc;
-    1 => c.f_valp;
-] => i.f.pred_pc;
+    mtc(c.f_icode, [JX, CALL]) => c.f_valc; @f_predPC_f_valC_FF
+    1 => c.f_valp;                          @f_predPC_f_valP_FF
+] => i.f.pred_pc,                           @f_predPC_FF;
 
 /////////////////// Decode and Write back stage ///////////////////
 
@@ -108,25 +111,25 @@ d_rvalb u64 := o.reg_file.valb;
 // What should be the A value?
 // Forward into decode stage for valA
 d_vala u64 = [
-    mtc(D.icode, [CALL, JX]) => D.valp;  // Use incremented PC
-    c.d_srca == c.e_dste => c.e_vale;    // Forward valE from execute
-    c.d_srca == M.dstm => c.m_valm;      // Forward valM from memory
-    c.d_srca == M.dste => M.vale;        // Forward valE from memory
-    c.d_srca == W.dstm => W.valm;        // Forward valM from write back
-    c.d_srca == W.dste => W.vale;        // Forward valE from write back
-    1 => c.d_rvala;                      // Use value read from register file
-] => i.e.vala;
+    mtc(D.icode, [CALL, JX]) => D.valp;@dec_D_valP_DD                // Use incremented PC
+    c.d_srca == c.e_dste => c.e_vale;  @fw_e_valE_EE @fw_e_valE_a_EE // Forward valE from execute
+    c.d_srca == M.dstm => c.m_valm;    @fw_m_valM_MM @fw_m_valM_a_MM // Forward valM from memory
+    c.d_srca == M.dste => M.vale;      @fw_M_valE_MM @fw_M_valE_a_MM // Forward valE from memory
+    c.d_srca == W.dstm => W.valm;      @fw_W_valM_WW @fw_W_valM_a_WW // Forward valM from write back
+    c.d_srca == W.dste => W.vale;      @fw_W_valE_WW @fw_W_valE_a_WW // Forward valE from write back
+    1 => c.d_rvala;                    @dec_d_rvalA_DD               // Use value read from register file
+] => i.e.vala,                         @d_valA_DD;
 
 d_valb u64 = [
-    c.d_srcb == c.e_dste => c.e_vale;    // Forward valE from execute
-    c.d_srcb == M.dstm => c.m_valm;      // Forward valM from memory
-    c.d_srcb == M.dste => M.vale;        // Forward valE from memory
-    c.d_srcb == W.dstm => W.valm;        // Forward valM from write back
-    c.d_srcb == W.dste => W.vale;        // Forward valE from write back
-    1 => c.d_rvalb;                      // Use value read from register file
-] => i.e.valb;
+    c.d_srcb == c.e_dste => c.e_vale; @fw_e_valE_EE  // Forward valE from execute
+    c.d_srcb == M.dstm => c.m_valm;   @fw_m_valM_MM  // Forward valM from memory
+    c.d_srcb == M.dste => M.vale;     @fw_M_valE_MM  // Forward valE from memory
+    c.d_srcb == W.dstm => W.valm;     @fw_W_valM_WW  // Forward valM from write back
+    c.d_srcb == W.dste => W.vale;     @fw_W_valE_WW  // Forward valE from write back
+    1 => c.d_rvalb;                   @dec_d_rvalB_DD // Use value read from register file
+] => i.e.valb,                        @d_valB_DD;
 
-d_valc u64 := D.valc => i.e.valc;
+d_valc u64 := D.valc => i.e.valc, @d_valC;
 d_icode u8 := D.icode => i.e.icode;
 d_ifun u8 := D.ifun => i.e.ifun;
 d_stat Stat := D.stat => i.e.stat;
@@ -135,20 +138,22 @@ d_stat Stat := D.stat => i.e.stat;
 
 // Select input A to ALU
 alua u64 = [
-    mtc(E.icode, [CMOVX, OPQ ]) => E.vala;
-    mtc(E.icode, [IRMOVQ, RMMOVQ, MRMOVQ ]) => E.valc;
+    mtc(E.icode, [CMOVX, OPQ ]) => E.vala;             @aluA_valA_EE
+    mtc(E.icode, [IRMOVQ, RMMOVQ, MRMOVQ ]) => E.valc; @aluA_valC_EE
     mtc(E.icode, [CALL, PUSHQ ]) => -8i64 as u64;
     mtc(E.icode, [RET, POPQ ]) => 8;
-    // Other instructions don't need ALU
-] => i.alu.a
+    // Other instructions don't need ALU, set to 0 for better debugging
+    1 => 0;
+] => i.alu.a, @aluA_EE
   => i.cc.a;
 
 // Select input B to ALU
 alub u64 = [
-    mtc(E.icode, [RMMOVQ, MRMOVQ, OPQ, CALL, PUSHQ, RET, POPQ]) => E.valb;
+    mtc(E.icode, [RMMOVQ, MRMOVQ, OPQ, CALL, PUSHQ, RET, POPQ]) => E.valb; @aluB_valB_EE
     mtc(E.icode, [CMOVX, IRMOVQ]) => 0;
-    // Other instructions don't need ALU
-] => i.alu.b
+    // Other instructions don't need ALU, set to 0 for better debugging
+    1 => 0;
+] => i.alu.b, @aluB_EE
   => i.cc.b;
 
 // Set the ALU function
@@ -168,7 +173,7 @@ set_cc bool := E.icode == OPQ &&
     => i.cc.set_cc;
 
 e_vale u64 := o.alu.e
-    => i.m.vale
+    => i.m.vale, @e_valE_EE
     => i.cc.e;
 
 cc_sf bool := o.cc.sf => i.cond.sf;
@@ -195,10 +200,10 @@ e_icode u8 := E.icode => i.m.icode;
 
 // Select memory address
 mem_addr u64 = [
-    mtc(M.icode, [RMMOVQ, PUSHQ, CALL, MRMOVQ]) => M.vale;
-    mtc(M.icode, [POPQ, RET]) => M.vala;
+    mtc(M.icode, [RMMOVQ, PUSHQ, CALL, MRMOVQ]) => M.vale; @mem_addr_valE_MM
+    mtc(M.icode, [POPQ, RET]) => M.vala; @mem_addr_valA_MM
     // Other instructions don't need address
-] => i.dmem.addr;
+] => i.dmem.addr, @DM_mem_addr_MM;
 
 // Set read control signal
 mem_read bool := mtc(M.icode, [MRMOVQ, POPQ, RET]) => i.dmem.read;
@@ -206,7 +211,7 @@ mem_read bool := mtc(M.icode, [MRMOVQ, POPQ, RET]) => i.dmem.read;
 // Set write control signal
 mem_write bool := mtc(M.icode, [RMMOVQ, PUSHQ, CALL]) => i.dmem.write;
 
-mem_datain u64 := M.vala => i.dmem.datain;
+mem_datain u64 := M.vala => i.dmem.datain, @DM_M_valA_MM;
 
 // Update the status
 m_stat Stat = [
@@ -216,8 +221,8 @@ m_stat Stat = [
 
 m_icode u8 := M.icode => i.w.icode;
 
-m_valm u64 := o.dmem.dataout => i.w.valm;
-m_vale u64 := M.vale => i.w.vale;
+m_valm u64 := o.dmem.dataout => i.w.valm, @m_valM_MM;
+m_vale u64 := M.vale => i.w.vale, @m_valE_MM;
 m_dste u8 := M.dste => i.w.dste;
 m_dstm u8 := M.dstm => i.w.dstm;
 
@@ -294,18 +299,13 @@ m_bubble bool :=
 // Should I stall or inject a bubble into Pipeline Register W?
 w_stall bool := mtc(W.stat, [Stat::Adr, Stat::Ins, Stat::Hlt]) => i.w.stall;
 w_bubble bool := false => i.w.bubble;
+
 }
 
 impl Pipeline<Signals, Devices> {
-    pub fn step(&mut self) -> (Signals, TransLog) {
+    pub fn step(&mut self) -> (Signals, Tracer) {
         println!("{:=^60}", " Run Cycle ");
-        let (devout, log) = Self::update(
-            &mut self.runtime_signals.2,
-            &mut self.runtime_signals.0,
-            self.runtime_signals.1.clone(),
-            &mut self.devices,
-            &self.graph.order,
-        );
+        let (devout, tracer) = self.update();
         // for stage regitsers (compute for next):
         // - current info in this cycle: self.runtime_signals.1
         // - next cycle info: devout
@@ -354,7 +354,7 @@ impl Pipeline<Signals, Devices> {
             self.runtime_signals.1.w = w;
         }
 
-        (saved_state, log)
+        (saved_state, tracer)
     }
 
     pub fn mem(&self) -> [u8; BIN_SIZE] {
@@ -376,12 +376,14 @@ impl Pipeline<Signals, Devices> {
         let (i, o, c) = &self.runtime_signals;
         println!(
 
-r#"{summary:=^60}
+r#"{summary:-^60}
 Stat    F {fstat:?}    D {dstat:?}    E {estat:?}    M {mstat:?}    W {wstat:?}
 icode   f {ficode:6} D {dicode:6} E {eicode:6} M {micode:6} W {wicode:6}
 Control F {fctrl:6} D {dctrl:6} E {ectrl:6} M {mctrl:6} W {wctrl:6}
 f_pc {f_pc:#x} e_dste {e_dste} D_ra {d_ra} D_rb {d_rb}
-{regs}"#, 
+{regs}
+
+"#, 
 
 summary = " Summary ",
 fstat = Stat::Aok,
@@ -428,7 +430,6 @@ mod tests {
         asm::tests::RSUM_YS,
         assemble,
         pipeline::{hardware::Devices, pipe_full::Signals, Pipeline},
-        utils::mem_diff,
     };
 
     #[test]
@@ -438,14 +439,16 @@ mod tests {
 
         eprintln!("{}", r);
         let mut pipe: Pipeline<Signals, Devices> = Pipeline::init(r.obj.binary.clone());
+        // dbg!(&pipe.graph.nodes);
         while !pipe.is_terminate() {
-            let out = pipe.step();
+            let _out = pipe.step();
             // mem_print(&pipe.mem());
-            eprintln!("{:?}\n", out);
+            // eprintln!("{:?}\n", _out.1);
         }
 
-        mem_diff(&r.obj.binary, &pipe.mem());
+        // mem_diff(&r.obj.binary, &pipe.mem());
         // mem_print(&pipe.mem());
-        eprintln!("{}", r);
+        // eprintln!("{}", r);
+        // eprintln!("{:?}", pipe.graph.levels);
     }
 }

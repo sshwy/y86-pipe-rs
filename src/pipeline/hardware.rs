@@ -96,12 +96,9 @@ define_devices! {
         .output(vala: u64, valb: u64)
         state: [u64; 16]
     } {
-        if srca != RNONE {
-            *vala = state[srca as usize];
-        }
-        if srcb != RNONE {
-            *valb = state[srcb as usize];
-        }
+        // if RNONE, set to 0 for better debugging
+        *vala = if srca != RNONE { state[srca as usize] } else { 0 };
+        *valb = if srcb != RNONE { state[srcb as usize] } else { 0 };
         if dste != RNONE {
             eprintln!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
             state[dste as usize] = vale;
@@ -116,7 +113,6 @@ define_devices! {
         .input(a: u64, b: u64, fun: u8)
         .output(e: u64)
     } {
-        eprintln!("alu: fun = {}", fun);
         *e = match fun {
             ADD => b.wrapping_add(a),
             SUB => b.wrapping_sub(a),
@@ -124,7 +120,6 @@ define_devices! {
             XOR => b ^ a,
             _ => 0,
         };
-        eprintln!("alu: a = {:#x}, b = {:#x}, e = {:#x}", a, b, e);
     }
 
     ConditionCode cc {

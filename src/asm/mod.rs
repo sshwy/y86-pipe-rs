@@ -326,8 +326,8 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     let imm = Imm::from(it.next().unwrap());
                     let reg = Reg::from(it.next().unwrap());
                     let op_fn = OpFn::from(pair2.as_str());
-                    src_info.inst = Some(Inst::IOPQ(op_fn, imm,  reg));
-                },
+                    src_info.inst = Some(Inst::IOPQ(op_fn, imm, reg));
+                }
                 Rule::i_jx => {
                     let cond_fn = CondFn::from(it.next().unwrap().as_str());
                     let imm = Imm::from(it.next().unwrap());
