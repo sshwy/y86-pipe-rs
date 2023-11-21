@@ -104,7 +104,6 @@ impl SourceInfo {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "webapp", wasm_bindgen::prelude::wasm_bindgen)]
 pub struct SourceInfo {
     pub(crate) addr: Option<u64>,
     pub(crate) inst: Option<asm::Inst<asm::Imm>>,

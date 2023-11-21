@@ -28,6 +28,7 @@ macro_rules! define_devices {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Default, Debug, Clone)]
+            #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
             pub struct $dev_name {
                 $($(pub $iname: $itype, )*)?
                 $($(pub $pname: $ptype, )*)?
@@ -37,6 +38,7 @@ macro_rules! define_devices {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Debug, Clone)]
+            #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
             pub struct $dev_name {
                 $($(pub $oname: $otype, )*)?
                 $($(pub $pname: $ptype, )*)?
@@ -50,37 +52,13 @@ macro_rules! define_devices {
                 }
             })*
         }
-        // pub mod dev_pass {
-        //     #![allow(unused)]
-        //     #![allow(unused_imports)]
-        //     use super::*;
-        //     $(#[derive(Default, Debug, Clone)]
-        //     pub struct $dev_name {
-        //         $($(pub $pname: $ptype, )*)?
-        //     }
-        //     impl $dev_name {
-        //         pub fn load_input(input: dev_sig_in::$dev_name) -> Self {
-        //             Self {
-        //                 $($( $pname: input.$pname, )*)?
-        //             }
-        //         }
-        //         pub fn load_output(output: dev_sig_out::$dev_name) -> Self {
-        //             Self {
-        //                 $($( $pname: output.$pname, )*)?
-        //             }
-        //         }
-        //         pub fn load_default() -> Self {
-        //             Self {
-        //                 $($( $pname: $pdefault, )*)?
-        //             }
-        //         }
-        //     })*
-        // }
         #[derive(Default, Debug, Clone)]
+        #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
         pub struct DeviceInputSignal {
             $(pub $dev_short_name: dev_sig_in::$dev_name),*
         }
         #[derive(Default, Debug, Clone)]
+        #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
         pub struct DeviceOutputSignal {
             $(pub $dev_short_name: dev_sig_out::$dev_name),*
         }
@@ -148,8 +126,8 @@ macro_rules! define_devices {
         pub fn hardware_setup(rcd: &mut $crate::record::GraphBuilder) {
             $(
                rcd.add_device_node(stringify!($dev_short_name));
-               $( $( rcd.add_device_input(stringify!($dev_short_name), stringify!($iname)); )* )?
-               $( $( rcd.add_device_output(stringify!($dev_short_name), stringify!($oname)); )* )?
+               $( $( rcd.add_device_input(stringify!($dev_short_name), concat!(stringify!($dev_short_name), ".", stringify!($iname))); )* )?
+               $( $( rcd.add_device_output(stringify!($dev_short_name), concat!(stringify!($dev_short_name), ".", stringify!($oname))); )* )?
                $( $( rcd.add_device_pass(stringify!($dev_short_name), stringify!($pname)); )* )?
             )*
         }
@@ -165,10 +143,12 @@ fn mtc<T: Eq>(sig: T, choice: impl AsRef<[T]>) -> bool {
     false
 }
 
-// Define hardware control logic
+/// Define hardware control logic
+/// see `pipe_full.rs` for an example
 #[macro_export]
 macro_rules! hcl {
     {
+        // heads
         @hardware $hardware:path;
         @devinput $nex:ident;
         @devoutput $cur:ident;
@@ -176,14 +156,30 @@ macro_rules! hcl {
         @abbr $fstage:ident $dstage:ident $estage:ident $mstage:ident $wstage:ident
 
         $( @use $uty:path; )*
-        // @icodes $icodes:ident;
 
+        // intermediate values
         $(
+            // output intermediate value name and type
             $oname:ident $oty:ty
-            $(= [ $($cond:expr => $val:expr;)* ])?
-            $(:= $final:expr)?
-            $(=> $to:expr)*
+
+            // select from cases
+            $(= [
+                // can have multiple tunnel to trigger
+                $($cond:expr => $val:expr; $( @$tun:ident )*)*
+            ])?
+            $(:= $final:expr $(, @$tun_final:ident )?)?
+            $(=> $to:expr $(, @$tun_to:ident )?
+            )*
             ;
+        )*
+
+        // tunnel visualizations. computations are performed at the end of cycle
+        // before stage register update
+        $(
+            @tunnel $id:literal
+            // [$start:expr] -> [$inter_or_end:expr]
+            // $(-> [$end:expr] )?
+            $(if $tunnel_cond:expr)?;
         )*
     } => {
         #[allow(unused_imports)]
@@ -191,17 +187,17 @@ macro_rules! hcl {
 
         #[derive(Debug, Default, Clone)]
         #[allow(unused)]
+        #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
         pub struct IntermediateSignal {
-            $( $oname: $oty, )*
+            $( pub $oname: $oty, )*
         }
 
         use $hardware::*;
-        use $crate::record::NameList;
 
         #[allow(unused)]
         pub type Signals = (DeviceInputSignal, DeviceOutputSignal, IntermediateSignal);
 
-impl $crate::pipeline::Pipeline<Signals, Devices> {
+    impl $crate::pipeline::Pipeline<Signals, Devices> {
         fn build_graph() -> $crate::record::Graph {
             let mut g = $crate::record::GraphBuilder::new(stringify!($cur), stringify!($nex));
             g.add_pass_output(concat!(stringify!($cur), ".f"), stringify!($fstage));
@@ -234,13 +230,12 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
         }
         #[allow(unused)]
         #[allow(non_snake_case)]
-        fn update(
-            $inter: &mut IntermediateSignal,
-            $nex: &mut DeviceInputSignal,
-            $cur: DeviceOutputSignal,
-            devices: &mut Devices,
-            order: &NameList,
-        ) -> (DeviceOutputSignal, $crate::record::TransLog) {
+        fn update(&mut self) -> (DeviceOutputSignal, $crate::record::Tracer) {
+            let $inter = &mut self.runtime_signals.2;
+            let $nex = &mut self.runtime_signals.0;
+            let $cur = self.runtime_signals.1.clone();
+            let devices = &mut self.devices;
+
             use $crate::isa::inst_code::*;
             use $crate::isa::reg_code::*;
             use $crate::isa::op_code::*;
@@ -252,42 +247,56 @@ impl $crate::pipeline::Pipeline<Signals, Devices> {
             let $mstage = $cur.m.clone();
             let $wstage = $cur.w.clone();
 
-            let mut rcd = $crate::record::Record::new($nex, $cur, $inter);
+            use $crate::record::*;
+            let mut rcd = Record::new($nex, $cur, $inter);
 
-            $(
-                let mut $oname = |
-                    $nex: &mut DeviceInputSignal,
-                    $inter: &mut IntermediateSignal,
-                    logs: &mut $crate::record::TransLog,
-                    $cur: DeviceOutputSignal,
-                | {
+            $( let mut updater = |
+                $nex: &mut DeviceInputSignal,
+                $inter: &mut IntermediateSignal,
+                tracer: &mut Tracer,
+                $cur: DeviceOutputSignal,
+            | {
+                let mut has_tunnel_input = false;
+                $(
+                    $(if ($cond) as u8 != 0 {
+                        $inter.$oname = $val;
+                        $(
+                            has_tunnel_input = true;
+                            eprintln!("{}", ansi_term::Colour::Green.bold().paint(stringify!($tun)));
+                            tracer.trigger_tunnel(stringify!($tun));
+                        )*
+                    })else*
+                )?
+                $( $inter.$oname = $final;
                     $(
-                        $(if ($cond) as u8 != 0 {
-                            $inter.$oname = $val;
-                            logs.push(( stringify!($oname), stringify!($val) ))
-                        })else*
+                        eprintln!("{}", ansi_term::Colour::Blue.bold().paint(stringify!($tun_final)));
+                        tracer.trigger_tunnel(stringify!($tun_final));
+                        has_tunnel_input = true;
                     )?
-                    $( $inter.$oname = $final; )?
-                    $( $to = $inter.$oname.to_owned(); )*
-                };
-                rcd.add_update(stringify!($oname), &mut $oname);
-            )*
+                )?
+                $(
+                    $to = $inter.$oname.to_owned();
+                    if has_tunnel_input {
+                        $( eprintln!("{}", ansi_term::Colour::Blue.bold().paint(stringify!($tun_to)));
+                        tracer.trigger_tunnel(stringify!($tun_to));)?
+                    }
+                )*
+            };
+            rcd.add_update(stringify!($oname), &mut updater); )*
 
-            let mut logs = Vec::new();
-            for (is_device, name) in order {
+            for (is_device, name) in &self.graph.order {
                 if *is_device {
                     let (mut devin, mut devout) = rcd.clone_devsigs();
                     devices.run_name(name, (devin, &mut devout));
                     rcd.update_devout(devout)
                 } else { // combinatorial logics do not change output (cur)
-                    rcd.run_name(name, &mut logs);
+                    rcd.run_name(name);
                 }
             }
-            // todo: register execution, status handling
-            (rcd.clone_devsigs().1, logs)
+            rcd.finalize()
         }
 
-}
+    }
     };
 }
 
@@ -309,5 +318,79 @@ mod tests {
         let c = a;
         b[0] = 12;
         eprintln!("{:?}, {:?}", b[0], c[0]);
+    }
+    /// in visualization of the architecture of pipeline, each tunnel
+    /// starts from one ore more start points, may split to multiple heads,
+    /// reaching various destination. What we concern is
+    ///
+    /// 1. whether the signal in this tunnel counts,
+    /// 2. and what destination of it is important.
+    ///
+    /// The first one is determined by the source of its value.
+    /// The second one is determined by the destination of the tunnel.
+    ///
+    /// To better define the visulization of tunnels, we can specify
+    /// the sources and destinations that need to be visualized.
+    /// Also some intermediate values are not visualized,
+    /// but they are useful to determine whether a value counts.
+    ///
+    /// Design: available edges are:
+    /// 1. device output -> intermediate value
+    /// 2. intermediate value -> device input / intermediate value
+    ///
+    /// A tunnel can either be a single edge or two sets of
+    /// edges (A, B), where the destination of A is just the source of B.
+    ///
+    /// Notices that the intermediate value only choose one from sources,
+    /// and during visualization, a tunnel has a single source.
+    /// Thus (A, B) can be reduced to (a -> c, B).
+    ///
+    /// We can first define the condition for each edge,
+    /// and define tunnels explicitly. tunnel merging can be made
+    /// automatically.
+    ///
+    /// Moreover, a tunnel is simply (source, intermediate, ...dist)
+    /// For better readability, we maintain the condition separately.
+    #[test]
+    fn test_draw() {
+        println!(
+            r#"
+                     ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                     ┃      ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓┃
+W stat icode       valE   valM      dstE dstM              ┃┃
+   │     │           ┃      ┣━━━━━━━━│━━━━│━━━━━━━━━━━━━━━┓┃┃
+   │     ├───#Mem.##┄┃┄┄┄┄┄Data##    │    │               ┃┃┃ 
+   │     ├───Control┄┃┄┄┄┄┄memory    │    │               ┃┃┃
+   │     │           ┃  Addr┛  ┃     │    │               ┃┃┃
+   │     │           ┃  ┃ ┗━━━━┃━━━━━│━━━━│━━━━━━━━━━━━━━┓┃┃┃
+   │     │           ┗━━╋━━━━━━┃━━━━━│━━━━│━━━━━━━━━━━━━┓┃┃┃┃
+M stat icode    Cnd   valE   valA   dstE dstM           ┃┃┃┃┃
+   │     │       │      ┣━━━━━━┃━━━━━│━━━━│━━━━━━━━━━━━┓┃┃┃┃┃
+   │     │       CC─────ALU ┏━━┛     │    │            ┃┃┃┃┃┃
+   │     │          AluA┛ ┗━┃━━AluB  │    │            ┃┃┃┃┃┃
+   │     │           ┃┗━━━━━┫    ┃   │    │            ┃┃┃┃┃┃
+E stat icode   ifun valC  valA valB dstE dstM srcA srcB┃┃┃┃┃┃
+   │     │       │   ┃      ┃    ┃                     ┃┃┃┃┃┃
+   │     │       │   ┃  #######━###━━━━━━━━━━━━━━━━━━━━┛┃┃┃┃┃
+   │     │       │   ┃  #######━###━━━━━━━━━━━━━━━━━━━━━┛┃┃┃┃
+   │     │       │   ┃  Sel+Fwd━Fwd━━━━━━━━━━━━━━━━━━━━━━┃┛┃┃
+   │     │       │   ┃  ###A###━#B#━━━━━━━━━━━━━━━━━━━━━━┃━┫┃
+   │     │       │   ┃  #######━###━━━━━━━━━━━━━━━━━━━━━━┃━┃┫
+   │     │       │   ┃      ┃ ┃  ┃                       ┃ ┃┃
+   │     │       │   ┃      ┃ ┗Register━━━━━━━━━━━━━━━━━━┃━┫┃
+   │     │       │   ┃      ┗┓ ##file##━━━━━━━━━━━━━━━━━━┃━┃┛
+   │     │       │   ┗━━━━━┓ ┗━━━┓                       ┃ ┃
+D stat icode   ifun rA rB valC  valP                     ┃ ┃
+   │     │       │   │ │   ┣━━━━━┃━━━━━━━━━━Predict      ┃ ┃
+  Stat───┴───┐   │   │ │   ┃     ┣━━━━━━━━━━##PC###      ┃ ┃
+             Instruction━━━┛  ###PC####        ┃         ┃ ┃
+             ##memory###      increment        ┃         ┃ ┃
+                  ┣━━━━━━━━━━━━━━┛             ┃         ┃ ┃
+                Select━━━━━━━━━━━━━━━━━━━━━━━━━┃━━━━━━━━━┛ ┃
+                ##PC##━━━━━━━━━━━━━━━━━━━━━━━━━┃━━━━━━━━━━━┛
+F        predPC━┛                              ┃
+            ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+"#
+        )
     }
 }

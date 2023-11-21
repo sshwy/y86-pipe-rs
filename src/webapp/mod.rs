@@ -1,54 +1,129 @@
 //! Pipeline simulator for the web
 
+mod error;
+mod info;
+
+use self::error::AppError;
+use self::info::{CycleInfo, InstInfo};
 use crate::{
-    assemble,
-    object::{ObjectExt, SourceInfo},
-    pipeline::pipe_full::Signals,
-    record::TransLog,
-    Pipeline,
+    assemble, object::ObjectExt, pipeline::pipe_full::Signals, record::Tracer,
+    webapp::info::StageInfo, Pipeline,
 };
 use anyhow::Context;
+use anyhow::Result;
+use serde::Serialize;
+use serde_wasm_bindgen::Serializer;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct App {
     obj: ObjectExt,
     pipe: Pipeline,
-    records: Vec<(Signals, TransLog)>,
+    inst_info: Vec<InstInfo>,
+    cycle_info: Vec<CycleInfo>,
+    serailzer: serde_wasm_bindgen::Serializer,
 }
 
-#[wasm_bindgen]
-impl SourceInfo {
-    pub fn addr(&self) -> Option<u64> {
-        self.addr
-    }
-    pub fn source(&self) -> String {
-        self.src.clone()
-    }
-}
+const DEFAULT_SOURCE: &str = r#"
+# a simple a + b program
+    .pos 0
+    irmovq input, %rdi
+    mrmovq (%rdi), %rdx
+    mrmovq 8(%rdi), %rax
+    addq %rdx, %rax
+    halt
+    .align 8
+input:
+    .quad 0x1234
+    .quad 0x4321
+"#;
 
 #[wasm_bindgen]
 impl App {
     #[wasm_bindgen(constructor)]
-    pub fn new(src: &str) -> Result<App, String> {
-        let obj = assemble(src, Default::default())
-            .context("assemble source file")
-            .map_err(|e| e.to_string())?;
+    pub fn new() -> Result<App, AppError> {
+        let obj = assemble(DEFAULT_SOURCE, Default::default()).context("assemble source file")?;
         let pipe = Pipeline::init(obj.obj.binary);
         Ok(App {
             obj,
             pipe,
-            records: Default::default(),
+            inst_info: Default::default(),
+            cycle_info: Default::default(),
+            serailzer: Serializer::new().serialize_large_number_types_as_bigints(true),
         })
     }
-    /// step the simulator, return true if is terminated
-    pub fn step(&mut self) -> bool {
-        let r: (Signals, TransLog) = self.pipe.step();
-        self.records.push(r);
-        // todo: get device info
-        return self.pipe.is_terminate();
+    pub fn is_terminated(&self) -> bool {
+        self.pipe.is_terminate()
     }
-    pub fn src_info(&self) -> Vec<SourceInfo> {
-        self.obj.source.clone()
+    /// step the simulator, return changes of each stage
+    pub fn step(&mut self) -> Result<JsValue, AppError> {
+        let (sigs, logs): (Signals, Tracer) = self.pipe.step();
+
+        // update instinfos
+        self.inst_info.push(InstInfo::new(&sigs, &self.obj.source)?);
+        let mut it = self.inst_info.iter_mut().rev().take(5);
+
+        macro_rules! tun_filter {
+            ($tunnel:expr, $suf:literal) => {
+                $tunnel
+                    .iter()
+                    .copied()
+                    .filter(|s| s.ends_with($suf))
+                    .collect()
+            };
+        }
+
+        if let Some(inst) = it.next() {
+            inst.fetch = Some(StageInfo {
+                tunnels: tun_filter!(logs.tunnel, "FF"),
+            });
+        }
+        if let Some(inst) = it.next() {
+            inst.decode = Some(StageInfo {
+                tunnels: tun_filter!(logs.tunnel, "DD"),
+            });
+        }
+        if let Some(inst) = it.next() {
+            inst.execute = Some(StageInfo {
+                tunnels: tun_filter!(logs.tunnel, "EE"),
+            });
+        }
+        if let Some(inst) = it.next() {
+            inst.memory = Some(StageInfo {
+                tunnels: tun_filter!(logs.tunnel, "MM"),
+            });
+        }
+        if let Some(inst) = it.next() {
+            inst.writeback = Some(StageInfo {
+                tunnels: tun_filter!(logs.tunnel, "WW"),
+            });
+        }
+
+        let cycle_id = self.cycle_info.len() as u64;
+        let c = CycleInfo {
+            cycle_id,
+            signals: sigs,
+            tunnels: logs.tunnel,
+        };
+        let r = c.serialize(&self.serailzer)?; // serde_wasm_bindgen::to_value(&c)?;
+        self.cycle_info.push(c);
+        Ok(r)
+    }
+    pub fn instructions(&self) -> Result<JsValue, AppError> {
+        Ok(self.inst_info.serialize(&self.serailzer)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+
+    #[test]
+    fn test_app() {
+        let mut app = App::new().unwrap();
+        while !app.is_terminated() {
+            let r = app.step().unwrap();
+            dbg!(r);
+        }
     }
 }
