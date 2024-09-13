@@ -17,10 +17,6 @@ struct Args {
     #[arg(short = 'r', long)]
     run: bool,
 
-    /// run the assembled binary in tui mode
-    #[arg(short = None, long)]
-    tui: bool,
-
     #[arg(short = 'v', long)]
     verbose: bool,
 }
@@ -34,7 +30,7 @@ fn main() -> Result<()> {
         AssembleOption::default().set_verbose(args.verbose),
     )?;
 
-    if args.run || args.tui {
+    if args.run {
         if args.output.is_some() {
             let mut cmd = Args::command();
             cmd.error(
@@ -45,26 +41,13 @@ fn main() -> Result<()> {
         }
         let mut pipe: Pipeline = Pipeline::init(obj.obj.binary);
 
-        if args.tui {
-            if !cfg!(feature = "tuiapp") {
-                Args::command()
-                    .error(
-                        ErrorKind::UnknownArgument,
-                        "tui feature is not enabled in this build",
-                    )
-                    .exit();
-            }
-            #[cfg(feature = "tuiapp")]
-            y86_pipe_rs::tui::app(pipe)?;
-        } else {
-            while !pipe.is_terminate() {
-                let _out = pipe.step();
-            }
-
-            mem_diff(&obj.obj.binary, &pipe.mem());
-            // mem_print(&pipe.mem());
-            eprintln!("{}", obj);
+        while !pipe.is_terminate() {
+            let _out = pipe.step();
         }
+
+        mem_diff(&obj.obj.binary, &pipe.mem());
+        // mem_print(&pipe.mem());
+        eprintln!("{}", obj);
     } else {
         let output_path = if let Some(path) = args.output {
             path

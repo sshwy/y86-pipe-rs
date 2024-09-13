@@ -26,17 +26,17 @@ impl Default for Stat {
 }
 
 /// pipeline runner
-pub struct Pipeline<Sigs: Default, Devices> {
+pub struct Pipeline<Sigs: Default, Units> {
     pub(crate) graph: Graph,
     /// signals are returned after each step, thus set to private
     runtime_signals: Sigs,
-    /// devices are not easily made clone, thus it's up to app to decide which information to save.
-    pub(crate) devices: Devices,
+    /// units are not easily made clone, thus it's up to app to decide which information to save.
+    pub(crate) units: Units,
     /// we have [`is_terminate`]
     terminate: bool,
 }
 
-impl<Sig: Default, Devices> Pipeline<Sig, Devices> {
+impl<Sig: Default, Units> Pipeline<Sig, Units> {
     pub fn is_terminate(&self) -> bool {
         self.terminate
     }

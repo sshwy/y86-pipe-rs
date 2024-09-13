@@ -10,40 +10,40 @@ mod webapp;
 
 pub use asm::assemble;
 pub use asm::AssembleOption;
-pub type Pipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Devices>;
+pub type Pipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Units>;
 pub use utils::{mem_diff, mem_print};
 
-/// this macro helps defining a set of devices composing a CPU
+/// This macro helps defining a set of devices composing a CPU.
 #[macro_export]
-macro_rules! define_devices {
+macro_rules! define_units {
     ($(
         $(#[$att:meta])*
-        $dev_name:ident $dev_short_name:ident {
+        $unit_name:ident $unit_short_name:ident {
         $(.input( $($iname:ident : $itype:ty),* ))?
         $(.output( $($oname:ident : $otype:ty),* ))?
         $(.pass( $($pname:ident : $ptype:ty = $pdefault:expr),* ))?$([$pvar:ident])?
         $($sname:ident : $stype:ty),* $(,)?
     } $($body:block)?)*) => {
-        pub mod dev_sig_in {
+        pub mod unit_sig_in {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Default, Debug, Clone)]
             #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
-            pub struct $dev_name {
+            pub struct $unit_name {
                 $($(pub $iname: $itype, )*)?
                 $($(pub $pname: $ptype, )*)?
             })*
         }
-        pub mod dev_sig_out {
+        pub mod unit_sig_out {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Debug, Clone)]
             #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
-            pub struct $dev_name {
+            pub struct $unit_name {
                 $($(pub $oname: $otype, )*)?
                 $($(pub $pname: $ptype, )*)?
             }
-            impl Default for $dev_name { // initialized as bubble status
+            impl Default for $unit_name { // initialized as bubble status
                 fn default() -> Self {
                     Self {
                         $($($oname: Default::default(), )*)?
@@ -54,34 +54,37 @@ macro_rules! define_devices {
         }
         #[derive(Default, Debug, Clone)]
         #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
-        pub struct DeviceInputSignal {
-            $(pub $dev_short_name: dev_sig_in::$dev_name),*
+        pub struct UnitInputSignal {
+            $(pub $unit_short_name: unit_sig_in::$unit_name),*
         }
         #[derive(Default, Debug, Clone)]
         #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
-        pub struct DeviceOutputSignal {
-            $(pub $dev_short_name: dev_sig_out::$dev_name),*
+        pub struct UnitOutputSignal {
+            $(pub $unit_short_name: unit_sig_out::$unit_name),*
         }
 
-        // the trait of these signals
-        pub trait Device {
-            fn run(&mut self, signals: (DeviceInputSignal, &mut DeviceOutputSignal));
+        /// A unit simulates a circuit in the CPU. It receives signals from
+        /// the previous stage and outputs signals to the next stage.
+        ///
+        /// Units include stages and combinational logics.
+        pub trait Unit {
+            fn run(&mut self, signals: (UnitInputSignal, &mut UnitOutputSignal));
         }
 
         $( #[allow(unused)]
         $(#[$att])*
-        struct $dev_name {
+        struct $unit_name {
              $(pub $sname: $stype ),*
         } )*
 
-        $( impl $dev_name {
+        $( impl $unit_name {
             #[allow(unused)]
             pub fn trigger(Self{ $( $sname ),* }: &mut Self,
-                inputs: dev_sig_in::$dev_name,
-                outputs: &mut dev_sig_out::$dev_name,
+                inputs: unit_sig_in::$unit_name,
+                outputs: &mut unit_sig_out::$unit_name,
             ) {
-                let dev_sig_in::$dev_name{$($( $iname, )*)? .. } = inputs;
-                let dev_sig_out::$dev_name{$($( $oname, )*)? .. } = outputs;
+                let unit_sig_in::$unit_name{$($( $iname, )*)? .. } = inputs;
+                let unit_sig_out::$unit_name{$($( $oname, )*)? .. } = outputs;
 
                 $(
                     if inputs.bubble {
@@ -95,40 +98,44 @@ macro_rules! define_devices {
                         // do nothing
                     }
                 )?
-                // $( let $pvar = dev_pass::$dev_name::load_default(); )?
+                // $( let $pvar = unit_pass::$unit_name::load_default(); )?
 
+                // for functional units, we execute its logic here
                 $($body)?
             }
         }
-        impl Device for $dev_name {
+        impl Unit for $unit_name {
             #[allow(unused)]
-            fn run(&mut self, (input, output): (DeviceInputSignal, &mut DeviceOutputSignal)) {
-                $dev_name::trigger(self, input.$dev_short_name, &mut output.$dev_short_name)
+            fn run(&mut self, (input, output): (UnitInputSignal, &mut UnitOutputSignal)) {
+                $unit_name::trigger(self, input.$unit_short_name, &mut output.$unit_short_name)
             }
         }
         )*
 
-        pub struct Devices {
-            $( $dev_short_name: $dev_name, )*
+        pub struct Units {
+            $( $unit_short_name: $unit_name, )*
         }
-        impl Devices {
+        impl Units {
+            /// Execute this unit by processing the input signals and updating its output signals.
             #[allow(unused)]
-            pub fn run_name(&mut self, name: &'static str, sigs: (DeviceInputSignal, &mut DeviceOutputSignal)) {
+            pub fn run(&mut self, name: &'static str, sigs: (UnitInputSignal, &mut UnitOutputSignal)) {
                 match name {
-                    $( stringify!($dev_short_name) =>
-                        self.$dev_short_name.run(sigs),
+                    $( stringify!($unit_short_name) =>
+                        self.$unit_short_name.run(sigs),
                     )*
                     _ => panic!("invalid name")
                 }
             }
         }
 
+        /// This function add all devices nodes, input ports, output ports and pass signals
+        /// to the graph builder.
         pub fn hardware_setup(rcd: &mut $crate::record::GraphBuilder) {
             $(
-               rcd.add_device_node(stringify!($dev_short_name));
-               $( $( rcd.add_device_input(stringify!($dev_short_name), concat!(stringify!($dev_short_name), ".", stringify!($iname))); )* )?
-               $( $( rcd.add_device_output(stringify!($dev_short_name), concat!(stringify!($dev_short_name), ".", stringify!($oname))); )* )?
-               $( $( rcd.add_device_pass(stringify!($dev_short_name), stringify!($pname)); )* )?
+               rcd.add_unit_node(stringify!($unit_short_name));
+               $( $( rcd.add_unit_input(stringify!($unit_short_name), concat!(stringify!($unit_short_name), ".", stringify!($iname))); )* )?
+               $( $( rcd.add_unit_output(stringify!($unit_short_name), concat!(stringify!($unit_short_name), ".", stringify!($oname))); )* )?
+               $( $( rcd.add_unit_pass(stringify!($unit_short_name), stringify!($pname)); )* )?
             )*
         }
     };
@@ -143,15 +150,15 @@ fn mtc<T: Eq>(sig: T, choice: impl AsRef<[T]>) -> bool {
     false
 }
 
-/// Define hardware control logic
-/// see `pipe_full.rs` for an example
+/// This macro minics the HCL language syntax to define hardware control logic.
+/// See `pipe_full.rs` for an example
 #[macro_export]
 macro_rules! hcl {
     {
         // heads
         @hardware $hardware:path;
-        @devinput $nex:ident;
-        @devoutput $cur:ident;
+        @unit_input $nex:ident;
+        @unit_output $cur:ident;
         @intermediate $inter:ident;
         @abbr $fstage:ident $dstage:ident $estage:ident $mstage:ident $wstage:ident
 
@@ -195,9 +202,9 @@ macro_rules! hcl {
         use $hardware::*;
 
         #[allow(unused)]
-        pub type Signals = (DeviceInputSignal, DeviceOutputSignal, IntermediateSignal);
+        pub type Signals = (UnitInputSignal, UnitOutputSignal, IntermediateSignal);
 
-    impl $crate::pipeline::Pipeline<Signals, Devices> {
+    impl $crate::pipeline::Pipeline<Signals, Units> {
         fn build_graph() -> $crate::record::Graph {
             let mut g = $crate::record::GraphBuilder::new(stringify!($cur), stringify!($nex));
             g.add_pass_output(concat!(stringify!($cur), ".f"), stringify!($fstage));
@@ -230,16 +237,15 @@ macro_rules! hcl {
         }
         #[allow(unused)]
         #[allow(non_snake_case)]
-        fn update(&mut self) -> (DeviceOutputSignal, $crate::record::Tracer) {
+        fn update(&mut self) -> (UnitOutputSignal, $crate::record::Tracer) {
             let $inter = &mut self.runtime_signals.2;
             let $nex = &mut self.runtime_signals.0;
             let $cur = self.runtime_signals.1.clone();
-            let devices = &mut self.devices;
+            let units = &mut self.units;
 
             use $crate::isa::inst_code::*;
             use $crate::isa::reg_code::*;
             use $crate::isa::op_code::*;
-            // use $crate::isa::cond_fn as COND;
             use $crate::mtc;
             let $fstage = $cur.f.clone();
             let $dstage = $cur.d.clone();
@@ -251,10 +257,10 @@ macro_rules! hcl {
             let mut rcd = Record::new($nex, $cur, $inter);
 
             $( let mut updater = |
-                $nex: &mut DeviceInputSignal,
+                $nex: &mut UnitInputSignal,
                 $inter: &mut IntermediateSignal,
                 tracer: &mut Tracer,
-                $cur: DeviceOutputSignal,
+                $cur: UnitOutputSignal,
             | {
                 let mut has_tunnel_input = false;
                 $(
@@ -284,13 +290,13 @@ macro_rules! hcl {
             };
             rcd.add_update(stringify!($oname), &mut updater); )*
 
-            for (is_device, name) in &self.graph.order {
-                if *is_device {
-                    let (mut devin, mut devout) = rcd.clone_devsigs();
-                    devices.run_name(name, (devin, &mut devout));
-                    rcd.update_devout(devout)
+            for (is_unit, name) in &self.graph.order {
+                if *is_unit {
+                    let (mut unit_in, mut unit_out) = rcd.signals();
+                    units.run(name, (unit_in, &mut unit_out));
+                    rcd.update_from_unit_out(unit_out)
                 } else { // combinatorial logics do not change output (cur)
-                    rcd.run_name(name);
+                    rcd.run_combinatorial_logic(name);
                 }
             }
             rcd.finalize()
@@ -335,8 +341,8 @@ mod tests {
     /// but they are useful to determine whether a value counts.
     ///
     /// Design: available edges are:
-    /// 1. device output -> intermediate value
-    /// 2. intermediate value -> device input / intermediate value
+    /// 1. unit output -> intermediate value
+    /// 2. intermediate value -> unit input / intermediate value
     ///
     /// A tunnel can either be a single edge or two sets of
     /// edges (A, B), where the destination of A is just the source of B.

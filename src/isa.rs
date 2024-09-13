@@ -1,4 +1,4 @@
-//! Instruction Set definition for Y86-64 Architecture */
+//! Instruction Set definition for Y86-64 Architecture
 
 pub const BIN_SIZE: usize = 1 << 16;
 

@@ -10,12 +10,12 @@ use crate::isa::op_code::*;
 use crate::isa::reg_code;
 use crate::isa::reg_code::*;
 use crate::{
-    define_devices,
+    define_units,
     isa::BIN_SIZE,
     utils::{get_u64, put_u64},
 };
 
-define_devices! {
+define_units! {
     // stage registers and default values for bubble status
 
     /// Fetch stage registers.
@@ -23,7 +23,6 @@ define_devices! {
     Fstage f {
         .input(stall: bool, bubble: bool)
         .pass(pred_pc: u64 = 0)
-    } {
     }
     Dstage d {
         .input(stall: bool, bubble: bool)
@@ -36,6 +35,7 @@ define_devices! {
             vala: u64 = 0, valb: u64 = 0, valc: u64 = 0, dste: u8 = RNONE,
             dstm: u8 = RNONE, srca: u8 = RNONE, srcb: u8 = RNONE)
     }
+    /// Memory Access Stage
     Mstage m {
         .input(stall: bool, bubble: bool)
         .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, cnd: bool = false,
@@ -187,7 +187,7 @@ define_devices! {
     }
 }
 
-impl Devices {
+impl Units {
     pub(crate) fn init(bin: [u8; BIN_SIZE]) -> Self {
         let cell = std::rc::Rc::new(RefCell::new(bin));
         Self {

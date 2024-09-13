@@ -14,7 +14,9 @@ but also zero-cost dev-time syntax highlighting and type checking.
 
 Moreover, we're able to build the computational graph 
 (only once before the first cycle) as a DAG and arrange the order of
-combinatorial logics and devices' execution topologically,
+execution of combinatorial logics and units topologically,
 without explicitly writing code for stepping cycles.
 
 Hope you enjoy.
+
+Note: the behavior of `cargo-expand` is incorrect.

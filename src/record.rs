@@ -5,16 +5,16 @@ use std::{
     hash::Hash,
 };
 
-/// Vec<(is_device, name)>
+/// Vec<(is_unit, name)>.
+/// A node can be either a unit name or a intermediate signal name.
 pub type NameList = Vec<(bool, &'static str)>;
 
 // return (receiver, producier)
-pub type Updater<'a, DevIn, DevOut, Inter> =
-    Box<&'a mut dyn FnMut(&mut DevIn, &mut Inter, &mut Tracer, DevOut)>;
+pub type Updater<'a, UnitIn, UnitOut, Inter> =
+    Box<&'a mut dyn FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut)>;
 
 #[derive(Debug)]
 pub struct Graph {
-    // pub(crate) levels: Vec<(String, i32)>,
     pub(crate) order: NameList,
     // Node format:
     // - `i.[fdemw].*`: stage register passin node
@@ -49,9 +49,9 @@ fn replace_abbr(abbrs: &[(&'static str, &'static str)], str: &str) -> String {
 // }
 // }
 
-/// compute topological order of nodes
+/// Compute topological order of nodes using BFS.
 ///
-/// return node list in order and their levels
+/// Return node list in order and their levels
 pub fn topo<Node: Copy + Eq + Hash + Debug>(
     nodes: impl Iterator<Item = Node> + Clone,
     edges: impl Iterator<Item = (Node, Node)> + Clone,
@@ -93,10 +93,11 @@ pub fn topo<Node: Copy + Eq + Hash + Debug>(
 }
 pub struct GraphBuilder {
     runnable_nodes: NameList,
-    device_nodes: Vec<String>,
+    unit_nodes: Vec<String>,
     nodes: BTreeSet<String>,
     edges: Vec<(String, String)>,
     passed_devices: BTreeSet<&'static str>,
+    /// (name, body)
     deps: Vec<(String, String)>,
     rev_deps: Vec<(String, String)>,
     // abbrs for pass output
@@ -110,7 +111,7 @@ impl GraphBuilder {
         Self {
             nodes: Default::default(),
             runnable_nodes: Default::default(),
-            device_nodes: Default::default(),
+            unit_nodes: Default::default(),
             deps: Default::default(),
             rev_deps: Default::default(),
             edges: Default::default(),
@@ -128,48 +129,50 @@ impl GraphBuilder {
         self.nodes.insert(to.clone());
         self.edges.push((from, to));
     }
+    /// Unit `name` is the dependency of units exists in `body`.
     pub fn add_rev_deps(&mut self, name: &'static str, body: &'static str) {
         self.rev_deps.push((name.to_string(), body.to_string()))
     }
-    pub fn add_device_node(&mut self, dev_name: &'static str) {
-        self.runnable_nodes.push((true, dev_name));
-        self.device_nodes.push(dev_name.to_string());
+    pub fn add_unit_node(&mut self, unit_name: &'static str) {
+        self.runnable_nodes.push((true, unit_name));
+        self.unit_nodes.push(unit_name.to_string());
     }
-    pub fn add_device_input(&mut self, dev_name: &'static str, field_name: &'static str) {
-        // dbg!(dev_name, field_name);
-        self.add_edge(field_name.to_string(), dev_name.to_string());
+    pub fn add_unit_input(&mut self, unit_name: &'static str, field_name: &'static str) {
+        // dbg!(unit_name, field_name);
+        self.add_edge(field_name.to_string(), unit_name.to_string());
     }
-    pub fn add_device_output(&mut self, dev_name: &'static str, field_name: &'static str) {
-        self.add_edge(dev_name.to_string(), field_name.to_string());
+    pub fn add_unit_output(&mut self, unit_name: &'static str, field_name: &'static str) {
+        self.add_edge(unit_name.to_string(), field_name.to_string());
     }
-    // pass means compute next input data from the current output data
-    // these device should be run at the end
-    pub fn add_device_pass(&mut self, dev_name: &'static str, field_name: &'static str) {
+    /// Pass means compute next input data from the current output data.
+    /// These units should be run at the end.
+    pub fn add_unit_pass(&mut self, unit_name: &'static str, field_name: &'static str) {
         self.nodes
-            .insert(String::from(self.output_prefix) + "." + dev_name + "." + field_name);
+            .insert(String::from(self.output_prefix) + "." + unit_name + "." + field_name);
         self.nodes
-            .insert(String::from(self.input_prefix) + "." + dev_name + "." + field_name);
-        // link input to device, without output
+            .insert(String::from(self.input_prefix) + "." + unit_name + "." + field_name);
+        // link input to unit, without output
         self.add_edge(
-            String::from(self.input_prefix) + "." + dev_name + "." + field_name,
-            dev_name.to_string(),
+            String::from(self.input_prefix) + "." + unit_name + "." + field_name,
+            unit_name.to_string(),
         );
-        self.passed_devices.insert(dev_name);
+        self.passed_devices.insert(unit_name);
     }
-    /// body: dependency
+    /// Set unit `name` as runnable, which depends on other units in `body`.
     pub fn add_update(&mut self, name: &'static str, body: &'static str) {
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
         self.deps.push((name.to_string(), body.to_string()));
     }
     fn init_deps(&mut self) {
+        // (from, to)
         let mut new_edges = Vec::new();
         for (name, body) in &self.deps {
             let body = replace_abbr(&self.abbrs, body);
             for node in &self.nodes {
                 // edges from device to there inputs/outputs has already bean added
                 // thus is filtered out
-                if node != name && body.contains(node) && !self.device_nodes.contains(node) {
+                if node != name && body.contains(node) && !self.unit_nodes.contains(node) {
                     new_edges.push((node.to_string(), name.to_string()));
                 }
             }
@@ -179,7 +182,7 @@ impl GraphBuilder {
             for node in &self.nodes {
                 // edges from device to there inputs/outputs has already bean added
                 // thus is filtered out
-                if node != name && body.contains(node) && !self.device_nodes.contains(node) {
+                if node != name && body.contains(node) && !self.unit_nodes.contains(node) {
                     new_edges.push((name.to_string(), node.to_string()));
                 }
             }
@@ -188,9 +191,10 @@ impl GraphBuilder {
             self.add_edge(from, to)
         }
     }
-    /// compute topological order of nodes
+    /// Compute topological order of nodes.
     pub fn build(mut self) -> Graph {
         self.init_deps();
+        println!("{:?}", &self.edges);
 
         let levels = topo(self.nodes.iter(), self.edges.iter().map(|(a, b)| (a, b)));
         let order: Vec<(bool, &'static str)> = levels
@@ -205,15 +209,8 @@ impl GraphBuilder {
         // put passed device (mainly stage registers) at the end
         order.append(&mut last);
 
-        // eprintln!("order: {:?}", &order);
-
         // order
-        Graph {
-            // levels: levels.into_iter().map(|(a, b)| (a.clone(), b)).collect(),
-            order,
-            // nodes: self.nodes.into_iter().collect(),
-            // edges: self.edges,
-        }
+        Graph { order }
     }
 }
 
@@ -230,52 +227,56 @@ impl Tracer {
     }
 }
 
-pub struct Record<'a, DevIn, DevOut, Inter> {
-    devin: &'a mut DevIn,
+pub struct Record<'a, UnitIn, UnitOut, Inter> {
+    unit_in: &'a mut UnitIn,
     context: &'a mut Inter,
-    devout: DevOut,
-    updates: BTreeMap<&'static str, Updater<'a, DevIn, DevOut, Inter>>,
+    unit_out: UnitOut,
+    updates: BTreeMap<&'static str, Updater<'a, UnitIn, UnitOut, Inter>>,
     tracer: Tracer,
 }
 
-impl<'a, DevIn: Clone, DevOut: Clone, Inter> Record<'a, DevIn, DevOut, Inter> {
-    pub fn new(devin: &'a mut DevIn, devout: DevOut, context: &'a mut Inter) -> Self {
+impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Record<'a, UnitIn, UnitOut, Inter> {
+    pub fn new(unit_in: &'a mut UnitIn, unit_out: UnitOut, context: &'a mut Inter) -> Self {
         Record {
-            devin,
-            devout,
+            unit_in,
+            unit_out,
             context,
             updates: Default::default(),
             tracer: Default::default(),
         }
     }
-    /// body: dependency
+    /// Generally, a circuit update function accepts output signal from previous units,
+    /// and then emits input signals of the next units or update intermediate signals.
     pub fn add_update(
         &mut self,
         name: &'static str,
-        func: &'a mut impl FnMut(&mut DevIn, &mut Inter, &mut Tracer, DevOut),
+        func: &'a mut impl FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut),
     ) {
         self.updates.insert(name, Box::new(func));
     }
-    pub fn run_name(&mut self, name: &'static str) {
+    /// Execute a combinatorial logic curcuits. See [`Record::add_update`].
+    pub fn run_combinatorial_logic(&mut self, name: &'static str) {
         if let Some(func) = self.updates.get_mut(name) {
             func(
-                self.devin,
+                self.unit_in,
                 self.context,
                 &mut self.tracer,
-                self.devout.clone(),
+                self.unit_out.clone(),
             )
         } else {
             panic!("invalid name")
         }
     }
-    pub fn clone_devsigs(&self) -> (DevIn, DevOut) {
-        (self.devin.clone(), self.devout.clone())
+    /// Get current signals.
+    pub fn signals(&self) -> (UnitIn, UnitOut) {
+        (self.unit_in.clone(), self.unit_out.clone())
     }
-    pub fn update_devout(&mut self, devout: DevOut) {
-        self.devout = devout
+    /// Update signals from outputs of a unit.
+    pub fn update_from_unit_out(&mut self, unit_out: UnitOut) {
+        self.unit_out = unit_out
     }
-    pub fn finalize(self) -> (DevOut, Tracer) {
-        (self.devout, self.tracer)
+    pub fn finalize(self) -> (UnitOut, Tracer) {
+        (self.unit_out, self.tracer)
     }
 }
 
@@ -297,8 +298,8 @@ mod tests {
         let mut rcd = Record::new(&mut x, (), &mut a);
         rcd.add_update("test", &mut updater);
         rcd.add_update("test2", &mut updater2);
-        rcd.run_name("test");
-        rcd.run_name("test2");
+        rcd.run_combinatorial_logic("test");
+        rcd.run_combinatorial_logic("test2");
         println!("a = {}, b = {}", a, b);
     }
 }

@@ -21,7 +21,9 @@ impl From<AppError> for JsValue {
     fn from(value: AppError) -> JsValue {
         match value {
             AppError::AnyError(err) => JsValue::from_str(format!("any error: {err:?}").as_str()),
-            AppError::SerdeJsonError(err) => JsValue::from_str(format!("serde error: {err:?}").as_str()),
+            AppError::SerdeJsonError(err) => {
+                JsValue::from_str(format!("serde error: {err:?}").as_str())
+            }
         }
     }
 }

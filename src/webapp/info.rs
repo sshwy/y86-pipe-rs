@@ -33,9 +33,7 @@ impl InstInfo {
             }
         });
         Ok(Self {
-            addr: src_info
-                .map(|a| a.addr)
-                .unwrap_or_default(),
+            addr: src_info.map(|a| a.addr).unwrap_or_default(),
             fetch: None,
             decode: None,
             execute: None,
@@ -49,5 +47,5 @@ impl InstInfo {
 pub struct CycleInfo {
     pub signals: Signals,
     pub cycle_id: u64,
-    pub tunnels: Vec<&'static str>, // todo: add device info
+    pub tunnels: Vec<&'static str>, // todo: add unit info
 }
