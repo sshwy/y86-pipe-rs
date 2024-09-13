@@ -22,28 +22,28 @@ define_units! {
     /// note that it's not possible to bubble (see hcl)
     Fstage f {
         .input(stall: bool, bubble: bool)
-        .pass(pred_pc: u64 = 0)
+        .stage(pred_pc: u64 = 0)
     }
     Dstage d {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
+        .stage(stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
             ra: u8 = RNONE, rb: u8 = RNONE, valc: u64 = 0, valp: u64 = 0)
     }
     Estage e {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
+        .stage(stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
             vala: u64 = 0, valb: u64 = 0, valc: u64 = 0, dste: u8 = RNONE,
             dstm: u8 = RNONE, srca: u8 = RNONE, srcb: u8 = RNONE)
     }
     /// Memory Access Stage
     Mstage m {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, cnd: bool = false,
+        .stage(stat: Stat = Stat::Bub, icode: u8 = NOP, cnd: bool = false,
             vale: u64 = 0, vala: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE)
     }
     Wstage w {
         .input(stall: bool, bubble: bool)
-        .pass(stat: Stat = Stat::Bub, icode: u8 = NOP, vale: u64 = 0,
+        .stage(stat: Stat = Stat::Bub, icode: u8 = NOP, vale: u64 = 0,
             valm: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE)
     }
 

@@ -96,7 +96,7 @@ pub struct GraphBuilder {
     unit_nodes: Vec<String>,
     nodes: BTreeSet<String>,
     edges: Vec<(String, String)>,
-    passed_devices: BTreeSet<&'static str>,
+    stage_units: BTreeSet<&'static str>,
     /// (name, body)
     deps: Vec<(String, String)>,
     rev_deps: Vec<(String, String)>,
@@ -115,13 +115,13 @@ impl GraphBuilder {
             deps: Default::default(),
             rev_deps: Default::default(),
             edges: Default::default(),
-            passed_devices: Default::default(),
+            stage_units: Default::default(),
             abbrs: Default::default(),
             output_prefix,
             input_prefix,
         }
     }
-    pub fn add_pass_output(&mut self, origin: &'static str, abbr: &'static str) {
+    pub fn add_stage_output(&mut self, origin: &'static str, abbr: &'static str) {
         self.abbrs.push((origin, abbr));
     }
     fn add_edge(&mut self, from: String, to: String) {
@@ -138,15 +138,16 @@ impl GraphBuilder {
         self.unit_nodes.push(unit_name.to_string());
     }
     pub fn add_unit_input(&mut self, unit_name: &'static str, field_name: &'static str) {
-        // dbg!(unit_name, field_name);
-        self.add_edge(field_name.to_string(), unit_name.to_string());
+        let full_name = String::from(unit_name) + "." + field_name;
+        self.add_edge(full_name.to_string(), unit_name.to_string());
     }
     pub fn add_unit_output(&mut self, unit_name: &'static str, field_name: &'static str) {
-        self.add_edge(unit_name.to_string(), field_name.to_string());
+        let full_name = String::from(unit_name) + "." + field_name;
+        self.add_edge(unit_name.to_string(), full_name.to_string());
     }
-    /// Pass means compute next input data from the current output data.
+    /// Stage units pass the current input data to the next cycle.
     /// These units should be run at the end.
-    pub fn add_unit_pass(&mut self, unit_name: &'static str, field_name: &'static str) {
+    pub fn add_unit_stage(&mut self, unit_name: &'static str, field_name: &'static str) {
         self.nodes
             .insert(String::from(self.output_prefix) + "." + unit_name + "." + field_name);
         self.nodes
@@ -156,7 +157,7 @@ impl GraphBuilder {
             String::from(self.input_prefix) + "." + unit_name + "." + field_name,
             unit_name.to_string(),
         );
-        self.passed_devices.insert(unit_name);
+        self.stage_units.insert(unit_name);
     }
     /// Set unit `name` as runnable, which depends on other units in `body`.
     pub fn add_update(&mut self, name: &'static str, body: &'static str) {
@@ -203,9 +204,9 @@ impl GraphBuilder {
 
         let (mut last, mut order): (NameList, _) = order
             .into_iter()
-            .partition(|o| o.0 && self.passed_devices.contains(o.1));
+            .partition(|o| o.0 && self.stage_units.contains(o.1));
 
-        // put passed device (mainly stage registers) at the end
+        // put stage units at the end
         order.append(&mut last);
 
         // order
