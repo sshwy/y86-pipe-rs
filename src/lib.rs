@@ -10,7 +10,7 @@ mod webapp;
 
 pub use asm::assemble;
 pub use asm::AssembleOption;
-pub type Pipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Units>;
+pub type DefaultPipeline = pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Units>;
 pub use utils::{mem_diff, mem_print};
 
 /// This macro helps defining a set of devices composing a CPU.

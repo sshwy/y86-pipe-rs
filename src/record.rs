@@ -194,7 +194,6 @@ impl GraphBuilder {
     /// Compute topological order of nodes.
     pub fn build(mut self) -> Graph {
         self.init_deps();
-        println!("{:?}", &self.edges);
 
         let levels = topo(self.nodes.iter(), self.edges.iter().map(|(a, b)| (a, b)));
         let order: Vec<(bool, &'static str)> = levels

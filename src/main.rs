@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use y86_pipe_rs::{assemble, mem_diff, AssembleOption, Pipeline};
+use y86_pipe_rs::{assemble, mem_diff, AssembleOption, DefaultPipeline as Pipeline};
 
 // Y86 assembler and pipeline simulator written in rust
 #[derive(Parser, Debug)]

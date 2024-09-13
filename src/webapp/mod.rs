@@ -7,7 +7,7 @@ use self::error::AppError;
 use self::info::{CycleInfo, InstInfo};
 use crate::{
     assemble, object::ObjectExt, pipeline::pipe_full::Signals, record::Tracer,
-    webapp::info::StageInfo, Pipeline,
+    webapp::info::StageInfo, DefaultPipeline as Pipeline,
 };
 use anyhow::Context;
 use anyhow::Result;
