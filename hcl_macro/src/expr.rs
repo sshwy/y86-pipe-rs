@@ -4,7 +4,7 @@ use quote::ToTokens;
 use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, Token};
 
 #[derive(Debug, Clone)]
-pub struct LValue(Punctuated<syn::Ident, Token![.]>);
+pub struct LValue(pub Punctuated<syn::Ident, Token![.]>);
 
 impl Parse for LValue {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
@@ -21,8 +21,7 @@ impl ToTokens for LValue {
     }
 }
 
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PrimaryExpr {
     LVal(LValue),
     LitInt(syn::LitInt),
@@ -48,7 +47,7 @@ impl Parse for PrimaryExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryExpr {
     Primary(PrimaryExpr),
     Not(Box<UnaryExpr>),
@@ -67,7 +66,7 @@ impl Parse for UnaryExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RelExpr {
     Unary(UnaryExpr),
     Eq(UnaryExpr, UnaryExpr),
@@ -99,7 +98,7 @@ impl Parse for RelExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LAndExpr {
     Rel(RelExpr),
 
@@ -121,7 +120,7 @@ impl Parse for LAndExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LOrExpr {
     LAnd(LAndExpr),
 
@@ -143,7 +142,7 @@ impl Parse for LOrExpr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr(LOrExpr);
 
 impl Parse for Expr {
@@ -290,5 +289,70 @@ impl Expr {
     /// Get all lvalues in the expression
     pub fn lvalues(&self) -> Punctuated<LValue, Token![,]> {
         self.0.lvalues()
+    }
+}
+
+impl LValue {
+    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        f(self)
+    }
+}
+
+impl PrimaryExpr {
+    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        match self {
+            PrimaryExpr::LVal(lval) => PrimaryExpr::LVal(lval.map(f)),
+            PrimaryExpr::Paren(expr) => PrimaryExpr::Paren(Box::new(expr.map(f))),
+            other => other,
+        }
+    }
+}
+
+impl UnaryExpr {
+    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        match self {
+            UnaryExpr::Primary(p) => UnaryExpr::Primary(p.map(f)),
+            UnaryExpr::Not(e) => UnaryExpr::Not(Box::new(e.map(f))),
+        }
+    }
+}
+
+impl RelExpr {
+    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        match self {
+            RelExpr::Unary(u) => RelExpr::Unary(u.map(f)),
+            RelExpr::Eq(lhs, rhs) => RelExpr::Eq(lhs.map(f.clone()), rhs.map(f)),
+            RelExpr::NotEq(lhs, rhs) => RelExpr::NotEq(lhs.map(f.clone()), rhs.map(f)),
+            RelExpr::In(lhs, values) => {
+                RelExpr::In(lhs.map(f.clone()), values.into_iter().map(f).collect())
+            }
+        }
+    }
+}
+
+impl LAndExpr {
+    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        match self {
+            LAndExpr::Rel(r) => LAndExpr::Rel(r.map(f)),
+            LAndExpr::RelLAnd(lhs, rhs) => {
+                LAndExpr::RelLAnd(lhs.map(f.clone()), Box::new(rhs.map(f)))
+            }
+        }
+    }
+}
+
+impl LOrExpr {
+    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        match self {
+            LOrExpr::LAnd(l) => LOrExpr::LAnd(l.map(f)),
+            LOrExpr::LAndOr(lhs, rhs) => LOrExpr::LAndOr(lhs.map(f.clone()), Box::new(rhs.map(f))),
+        }
+    }
+}
+
+impl Expr {
+    /// Map all lvalues in the expression
+    pub fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+        Self(self.0.map(f))
     }
 }

@@ -82,7 +82,7 @@ impl Parse for SignalSourceExpr {
 #[derive(Debug)]
 pub enum SignalSource {
     Switch(SignalSwitch),
-    Expr(SignalSourceExpr)
+    Expr(SignalSourceExpr),
 }
 
 impl Parse for SignalSource {

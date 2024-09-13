@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use expr::LValue;
 use items::{SignalDef, SignalSourceExpr, SignalSwitch};
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, parse_quote, punctuated::Punctuated, Token};
@@ -171,14 +172,25 @@ impl HclData {
             }
         }
     }
-    fn render_signal_updater(signal: &SignalDef) -> proc_macro2::TokenStream {
+    fn render_signal_updater(
+        signal: &SignalDef,
+        inter: &syn::Ident,
+        inter_names: &[&syn::Ident],
+    ) -> proc_macro2::TokenStream {
         let name = &signal.name;
+
+        let mapper = |mut lv: LValue| -> LValue {
+            if inter_names.contains(&&lv.0[0]) {
+                lv.0.insert(0, inter.clone().into());
+            }
+            lv
+        };
 
         let source_stmts = match &signal.source {
             items::SignalSource::Switch(SignalSwitch(cases)) => {
                 let case_stmts = cases.iter().map(|case| {
-                    let cond = &case.condition;
-                    let val = &case.value;
+                    let cond = case.condition.clone().map(mapper);
+                    let val = case.value.clone().map(mapper);
                     let tunnel_stmts = case
                         .tunnel.as_ref().cloned()
                         .map(|tunnel| {
@@ -202,6 +214,7 @@ impl HclData {
                 }
             }
             items::SignalSource::Expr(SignalSourceExpr { tunnel, expr }) => {
+                let expr = expr.clone().map(mapper);
                 let tunnel_stmts = tunnel.as_ref().cloned().map(|tunnel| {
                     quote! {
                         has_tunnel_input = true;
@@ -250,10 +263,16 @@ impl HclData {
                 #source_stmts
                 #dest_tunnel_stmts
             };
-            rcd.add_update(stringify!($cvar), &mut updater);
+            rcd.add_update(stringify!(#name), &mut updater);
         }
     }
     fn render_update(&self) -> proc_macro2::TokenStream {
+        let inter = &quote::format_ident!("c");
+        let inter_names = self
+            .intermediate_signals
+            .iter()
+            .map(|s| &s.name)
+            .collect::<Vec<_>>();
         let stage_alias_stmts = self
             .stage_alias
             .0
@@ -269,7 +288,7 @@ impl HclData {
         let updaters_stmt = self
             .intermediate_signals
             .iter()
-            .map(HclData::render_signal_updater)
+            .map(|s| HclData::render_signal_updater(s, inter, &inter_names))
             .reduce(|a, b| quote! { #a #b })
             .unwrap_or_default();
 
@@ -277,7 +296,7 @@ impl HclData {
             #[allow(unused)]
             #[allow(non_snake_case)]
             fn update(&mut self) -> (UnitOutputSignal, crate::record::Tracer) {
-                let c = &mut self.runtime_signals.2;
+                let #inter = &mut self.runtime_signals.2;
                 let i = &mut self.runtime_signals.0;
                 let o = self.runtime_signals.1.clone();
                 let units = &mut self.units;
