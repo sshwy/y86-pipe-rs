@@ -1,5 +1,4 @@
 [workspace]
 
-members = [
-    "sim",
-]
+resolver = "2"
+members = [ "hcl_macro", "sim", ]
