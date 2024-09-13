@@ -1,0 +1,33 @@
+[package]
+name = "y86-pipe-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Y86 simulator rust implementation"
+authors = ["Weiyao Huang <jy.cat@qq.com>"]
+repository = "https://github.com/sshwy/y86-pipe-rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Example of customizing binaries in Cargo.toml.
+[[bin]]
+name = "yars"
+path = "src/main.rs"
+
+[dependencies]
+ansi_term = "0.12.1"
+anyhow = "1.0.75"
+clap = { version = "4.4.8", features = ["derive"] }
+pest = "2.7.5"
+pest_derive = "2.7.5"
+regex = "1.10.2"
+
+wasm-bindgen = { version = "0.2.88", optional = true }
+serde-wasm-bindgen = { version = "0.4", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[features]
+webapp = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:serde"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
