@@ -51,6 +51,7 @@ macro_rules! define_units {
                 fn default() -> Self {
                     Self {
                         $($($oname: Default::default(), )*)?
+                        // default values for stage units are assigned for the first cycle
                         $($($pname: $pdefault, )*)?
                     }
                 }
@@ -65,11 +66,14 @@ macro_rules! define_units {
             pub struct $unit_name {
                 $($(pub $pname: $ptype, )*)?
             }
-            impl Default for $unit_name {
-                fn default() -> Self {
-                    Self {
-                        $($($pname: $pdefault, )*)?
-                    }
+            impl From<super::unit_out::$unit_name> for $unit_name {
+                fn from(_value: super::unit_out::$unit_name) -> Self {
+                    Self { $($($pname: _value.$pname, )*)? }
+                }
+            }
+            impl $unit_name {
+                pub fn update_output(self, _value: &mut super::unit_out::$unit_name) {
+                    $($(_value.$pname = self.$pname; )*)?
                 }
             })*
         }
@@ -82,6 +86,20 @@ macro_rules! define_units {
         #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
         pub struct UnitOutputSignal {
             $(pub $unit_short_name: unit_out::$unit_name),*
+        }
+        #[derive(Debug, Clone)]
+        pub struct UnitStageSignal {
+            $(pub $unit_short_name: unit_stage::$unit_name),*
+        }
+        impl From<UnitOutputSignal> for UnitStageSignal {
+            fn from(value: UnitOutputSignal) -> Self {
+                Self { $( $unit_short_name: value.$unit_short_name.into(), )* }
+            }
+        }
+        impl UnitStageSignal {
+            pub fn update_output(self, value: &mut UnitOutputSignal) {
+                $(self.$unit_short_name.update_output(&mut value.$unit_short_name); )*
+            }
         }
 
         /// A unit simulates a circuit in the CPU. It receives signals from
@@ -107,6 +125,8 @@ macro_rules! define_units {
                 let unit_in::$unit_name{$($( $iname, )*)? .. } = inputs;
                 let unit_out::$unit_name{$($( $oname, )*)? .. } = outputs;
 
+                // this block is executed at the end of the cycle
+                // todo: implement this logic in hardware
                 $(
                     if inputs.bubble {
                         $( outputs.$pname = $pdefault; )*
@@ -114,9 +134,12 @@ macro_rules! define_units {
                             panic!("bubble and stall at the same time")
                         }
                     } else if !inputs.stall {
+                        // if not stalled, we update the output signals
+                        // by its input signals computed in this cycle
                         $( outputs.$pname = inputs.$pname; )*
                     } else { // stall
-                        // do nothing
+                        // otherwise we keep the output signals
+                        // the same as the previous cycle
                     }
                 )?
 

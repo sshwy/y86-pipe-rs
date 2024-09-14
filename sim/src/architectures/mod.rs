@@ -336,29 +336,18 @@ impl Pipeline<Arch> {
         // - current info in this cycle: unit_out
         // combinatorial logics:
         // - current self.cur_inter
-        let UnitOutputSignal {
-            f,
-            d,
-            e,
-            m,
-            w,
-            imem,
-            ialign,
-            pc_inc,
-            reg_file,
-            alu,
-            cc,
-            cond,
-            dmem,
-        } = unit_out;
-        self.cur_unit_out.imem = imem;
-        self.cur_unit_out.ialign = ialign;
-        self.cur_unit_out.pc_inc = pc_inc;
-        self.cur_unit_out.reg_file = reg_file;
-        self.cur_unit_out.alu = alu;
-        self.cur_unit_out.cc = cc;
-        self.cur_unit_out.cond = cond;
-        self.cur_unit_out.dmem = dmem;
+
+        // status computed from previous cycle
+        // i. e. status during the current cycle
+        let cur_status = UnitStageSignal::from(self.cur_unit_out.clone());
+
+        // status computed from current cycle
+        // i. e. status during the next cycle
+        let next_status = UnitStageSignal::from(unit_out.clone());
+
+        // only update output signals to what computed in this cycle
+        self.cur_unit_out = unit_out;
+        cur_status.update_output(&mut self.cur_unit_out);
 
         // processor state after this cycle
         let saved_state = (
@@ -366,6 +355,7 @@ impl Pipeline<Arch> {
             self.cur_unit_out.clone(),
             self.cur_inter.clone(),
         );
+
         self.print_state();
 
         let stat = self.cur_inter.prog_stat;
@@ -374,11 +364,7 @@ impl Pipeline<Arch> {
             eprintln!("terminate!");
         } else {
             // prepare for the next cycle
-            self.cur_unit_out.f = f;
-            self.cur_unit_out.d = d;
-            self.cur_unit_out.e = e;
-            self.cur_unit_out.m = m;
-            self.cur_unit_out.w = w;
+            next_status.update_output(&mut self.cur_unit_out);
         }
 
         (saved_state, tracer)
