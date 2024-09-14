@@ -172,8 +172,8 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            pub(crate) fn build_circuit() -> crate::propagate::PropCircuit<Arch> {
-                use crate::propagate::*;
+            pub(crate) fn build_circuit() -> crate::pipeline::PropCircuit<Arch> {
+                use crate::pipeline::*;
 
                 // cur: o, nex: i
                 let order = {
@@ -300,7 +300,7 @@ impl HclData {
         quote! {
             #[allow(unused)]
             #[allow(non_snake_case)]
-            fn update(&mut self) -> (UnitOutputSignal, crate::propagate::Tracer) {
+            fn update(&mut self) -> (UnitOutputSignal, crate::pipeline::Tracer) {
                 let c = &mut self.cur_inter;
                 let i = &mut self.cur_unit_in;
                 let o = self.cur_unit_out.clone();

@@ -1,4 +1,6 @@
-use crate::propagate::PropCircuit;
+mod propagate;
+
+pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
 
 /// Pipeline State
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]

@@ -8,7 +8,7 @@ use self::info::{CycleInfo, InstInfo};
 use crate::architectures::pipe_full::Arch;
 use crate::pipeline::{CpuArch, Signals};
 use crate::{
-    assemble, object::ObjectExt, propagate::Tracer, webapp::info::StageInfo,
+    assemble, object::ObjectExt, pipeline::Tracer, webapp::info::StageInfo,
     DefaultPipeline as Pipeline,
 };
 use anyhow::Context;

@@ -4,7 +4,6 @@ mod dsl;
 pub mod isa;
 mod object;
 pub mod pipeline;
-mod propagate;
 mod utils;
 
 #[cfg(feature = "webapp")]

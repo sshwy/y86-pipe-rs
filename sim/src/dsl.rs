@@ -173,7 +173,7 @@ macro_rules! define_units {
 
         /// This function add all devices nodes, input ports, output ports and stage signals
         /// to the graph builder.
-        pub fn hardware_setup(builder: &mut $crate::propagate::PropOrderBuilder) {
+        pub fn hardware_setup(builder: &mut $crate::pipeline::PropOrderBuilder) {
             $(
             builder.add_unit_node(stringify!($unit_short_name));
             $( $( builder.add_unit_input(stringify!($unit_short_name), stringify!($iname)); )* )?
