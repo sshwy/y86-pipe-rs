@@ -1,6 +1,9 @@
 use hcl_macro::hcl;
 
-use crate::{isa::BIN_SIZE, pipeline::Pipeline};
+use crate::{
+    isa::BIN_SIZE,
+    pipeline::{Pipeline, Signals},
+};
 
 const NEG_8: u64 = -8i64 as u64;
 
@@ -311,26 +314,28 @@ bool w_stall = W.stat in { Adr, Ins, Hlt } -> i.w.stall;
 bool w_bubble = false -> i.w.bubble;
 }
 
-impl Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+impl Pipeline<Arch> {
     pub fn init(bin: [u8; BIN_SIZE]) -> Self {
         let units = Units::init(bin);
         Self {
             circuit: Pipeline::build_circuit(),
-            runtime_signals: Signals::default(),
+            cur_inter: IntermediateSignal::default(),
+            cur_unit_in: UnitInputSignal::default(),
+            cur_unit_out: UnitOutputSignal::default(),
             units,
             terminate: false,
         }
     }
-    pub fn step(&mut self) -> (Signals, crate::propagate::Tracer) {
+    pub fn step(&mut self) -> (Signals<Arch>, crate::propagate::Tracer) {
         println!("{:=^60}", " Run Cycle ");
         let (unit_out, tracer) = self.update();
         // for stage regitsers (compute for next):
-        // - current info in this cycle: self.runtime_signals.1
+        // - current info in this cycle: self.cur_unit_out
         // - next cycle info: unit_out
         // for other devices (compute for current):
         // - current info in this cycle: unit_out
         // combinatorial logics:
-        // - current self.runtime_signals.2
+        // - current self.cur_inter
         let UnitOutputSignal {
             f,
             d,
@@ -346,30 +351,34 @@ impl Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSig
             cond,
             dmem,
         } = unit_out;
-        self.runtime_signals.1.imem = imem;
-        self.runtime_signals.1.ialign = ialign;
-        self.runtime_signals.1.pc_inc = pc_inc;
-        self.runtime_signals.1.reg_file = reg_file;
-        self.runtime_signals.1.alu = alu;
-        self.runtime_signals.1.cc = cc;
-        self.runtime_signals.1.cond = cond;
-        self.runtime_signals.1.dmem = dmem;
+        self.cur_unit_out.imem = imem;
+        self.cur_unit_out.ialign = ialign;
+        self.cur_unit_out.pc_inc = pc_inc;
+        self.cur_unit_out.reg_file = reg_file;
+        self.cur_unit_out.alu = alu;
+        self.cur_unit_out.cc = cc;
+        self.cur_unit_out.cond = cond;
+        self.cur_unit_out.dmem = dmem;
 
         // processor state after this cycle
-        let saved_state = self.runtime_signals.clone();
+        let saved_state = (
+            self.cur_unit_in.clone(),
+            self.cur_unit_out.clone(),
+            self.cur_inter.clone(),
+        );
         self.print_state();
 
-        let stat = self.runtime_signals.2.prog_stat;
+        let stat = self.cur_inter.prog_stat;
         if stat != Stat::Aok && stat != Stat::Bub {
             self.terminate = true;
             eprintln!("terminate!");
         } else {
             // prepare for the next cycle
-            self.runtime_signals.1.f = f;
-            self.runtime_signals.1.d = d;
-            self.runtime_signals.1.e = e;
-            self.runtime_signals.1.m = m;
-            self.runtime_signals.1.w = w;
+            self.cur_unit_out.f = f;
+            self.cur_unit_out.d = d;
+            self.cur_unit_out.e = e;
+            self.cur_unit_out.m = m;
+            self.cur_unit_out.w = w;
         }
 
         (saved_state, tracer)
@@ -387,11 +396,13 @@ use crate::isa::{inst_code, reg_code};
 use ansi_term::Colour::{Red, Green};
 
 use super::*;
-impl Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+impl Pipeline<Arch> {
     // print state at the beginning of a cycle
     pub fn print_state(&self) {
         // For stage registers, outputs contains information for the following cycle
-        let (i, o, c) = &self.runtime_signals;
+        let i = &self.cur_unit_in;
+        let o = &self.cur_unit_out;
+        let c = &self.cur_inter;
         println!(
 
 r#"{summary:-^60}
@@ -432,12 +443,7 @@ regs = self.units.print_reg()
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        architectures::{IntermediateSignal, Signals, UnitInputSignal, UnitOutputSignal},
-        asm::tests::RSUM_YS,
-        assemble,
-        pipeline::{hardware::Units, Pipeline},
-    };
+    use crate::{architectures::Arch, asm::tests::RSUM_YS, assemble, pipeline::Pipeline};
 
     #[test]
     fn test_hcl() {
@@ -445,7 +451,7 @@ mod tests {
         let r = assemble(RSUM_YS, crate::AssembleOption::default()).unwrap();
 
         eprintln!("{}", r);
-        let mut pipe: Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> = Pipeline::init(r.obj.binary.clone());
+        let mut pipe: Pipeline<Arch> = Pipeline::init(r.obj.binary.clone());
         // dbg!(&pipe.graph.nodes);
         while !pipe.is_terminate() {
             let _out = pipe.step();

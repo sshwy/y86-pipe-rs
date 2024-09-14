@@ -1,6 +1,6 @@
 //! data records during execution
 
-use crate::{architectures::Signals, object::SourceInfo};
+use crate::{architectures::Arch, object::SourceInfo, pipeline::Signals};
 use anyhow::Result;
 use wasm_bindgen::prelude::*;
 
@@ -24,7 +24,7 @@ pub struct InstInfo {
 }
 
 impl InstInfo {
-    pub fn new(sigs: &Signals, src: &[SourceInfo]) -> Result<Self> {
+    pub fn new(sigs: &Signals<Arch>, src: &[SourceInfo]) -> Result<Self> {
         let src_info = src.iter().find(|o| {
             if let Some(addr) = o.addr {
                 addr == sigs.2.f_pc
@@ -45,7 +45,7 @@ impl InstInfo {
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct CycleInfo {
-    pub signals: Signals,
+    pub signals: Signals<Arch>,
     pub cycle_id: u64,
     pub tunnels: Vec<&'static str>, // todo: add unit info
 }

@@ -14,13 +14,7 @@ pub use asm::assemble;
 pub use asm::AssembleOption;
 pub use utils::{mem_diff, mem_print};
 
-pub type DefaultPipeline = pipeline::Pipeline<
-    architectures::Signals,
-    pipeline::hardware::Units,
-    pipeline::hardware::UnitInputSignal,
-    pipeline::hardware::UnitOutputSignal,
-    architectures::IntermediateSignal,
->;
+pub type DefaultPipeline = pipeline::Pipeline<architectures::Arch>;
 
 #[cfg(test)]
 mod tests {

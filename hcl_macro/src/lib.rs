@@ -172,7 +172,7 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            pub(crate) fn build_circuit() -> crate::propagate::PropCircuit<UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+            pub(crate) fn build_circuit() -> crate::propagate::PropCircuit<Arch> {
                 use crate::propagate::*;
 
                 // cur: o, nex: i
@@ -301,9 +301,9 @@ impl HclData {
             #[allow(unused)]
             #[allow(non_snake_case)]
             fn update(&mut self) -> (UnitOutputSignal, crate::propagate::Tracer) {
-                let c = &mut self.runtime_signals.2;
-                let i = &mut self.runtime_signals.0;
-                let o = self.runtime_signals.1.clone();
+                let c = &mut self.cur_inter;
+                let i = &mut self.cur_unit_in;
+                let o = self.cur_unit_out.clone();
 
                 let mut rcd = self.circuit.updates.make_propagator(i, o, c);
                 let units = &mut self.units;
@@ -340,9 +340,19 @@ impl HclData {
             #intermediate_signal_struct
 
             #[allow(unused)]
-            pub type Signals = (UnitInputSignal, UnitOutputSignal, IntermediateSignal);
+            pub struct Arch;
 
-            impl crate::pipeline::Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+            impl crate::pipeline::CpuCircuit for Arch {
+                type UnitIn = UnitInputSignal;
+                type UnitOut = UnitOutputSignal;
+                type Inter = IntermediateSignal;
+            }
+
+            impl crate::pipeline::CpuArch for Arch {
+                type Units = Units;
+            }
+
+            impl crate::pipeline::Pipeline<Arch> {
                 #build_circuit_fn
                 #update_fn
             }

@@ -5,7 +5,8 @@ mod info;
 
 use self::error::AppError;
 use self::info::{CycleInfo, InstInfo};
-use crate::architectures::Signals;
+use crate::architectures::Arch;
+use crate::pipeline::Signals;
 use crate::{
     assemble, object::ObjectExt, propagate::Tracer, webapp::info::StageInfo,
     DefaultPipeline as Pipeline,
@@ -58,7 +59,7 @@ impl App {
     }
     /// step the simulator, return changes of each stage
     pub fn step(&mut self) -> Result<JsValue, AppError> {
-        let (sigs, logs): (Signals, Tracer) = self.pipe.step();
+        let (sigs, logs): (Signals<Arch>, Tracer) = self.pipe.step();
 
         // update instinfos
         self.inst_info.push(InstInfo::new(&sigs, &self.obj.source)?);

@@ -5,6 +5,8 @@ use std::{
     hash::Hash,
 };
 
+use crate::pipeline::CpuCircuit;
+
 /// Vec<(is_unit, name)>.
 /// A node can be either a unit name or a intermediate signal name.
 pub type NameList = Vec<(bool, &'static str)>;
@@ -205,17 +207,17 @@ impl Tracer {
     }
 }
 
-pub struct PropUpdates<UnitIn, UnitOut, Inter> {
-    pub(crate) updates: BTreeMap<&'static str, Updater<UnitIn, UnitOut, Inter>>,
+pub struct PropUpdates<T: CpuCircuit> {
+    pub(crate) updates: BTreeMap<&'static str, Updater<T::UnitIn, T::UnitOut, T::Inter>>,
 }
 
-impl<UnitIn: Clone, UnitOut: Clone, Inter> PropUpdates<UnitIn, UnitOut, Inter> {
+impl<T: CpuCircuit> PropUpdates<T> {
     pub fn make_propagator<'a>(
         &'a mut self,
-        unit_in: &'a mut UnitIn,
-        unit_out: UnitOut,
-        context: &'a mut Inter,
-    ) -> Propagator<'a, UnitIn, UnitOut, Inter> {
+        unit_in: &'a mut T::UnitIn,
+        unit_out: T::UnitOut,
+        context: &'a mut T::Inter,
+    ) -> Propagator<'a, T> {
         Propagator {
             unit_in,
             unit_out,
@@ -227,12 +229,12 @@ impl<UnitIn: Clone, UnitOut: Clone, Inter> PropUpdates<UnitIn, UnitOut, Inter> {
 }
 
 /// Simulate the combinational logic circuits by update functions.
-pub struct PropCircuit<UnitIn, UnitOut, Inter> {
-    pub updates: PropUpdates<UnitIn, UnitOut, Inter>,
+pub struct PropCircuit<T: CpuCircuit> {
+    pub updates: PropUpdates<T>,
     pub order: PropOrder,
 }
 
-impl<UnitIn, UnitOut, Inter> PropCircuit<UnitIn, UnitOut, Inter> {
+impl<T: CpuCircuit> PropCircuit<T> {
     pub fn new(order: PropOrder) -> Self {
         Self {
             updates: PropUpdates {
@@ -243,28 +245,32 @@ impl<UnitIn, UnitOut, Inter> PropCircuit<UnitIn, UnitOut, Inter> {
     }
 }
 
-impl<UnitIn: Clone, UnitOut: Clone, Inter> PropCircuit<UnitIn, UnitOut, Inter> {
+impl<T: CpuCircuit> PropCircuit<T> {
     /// Generally, a circuit update function accepts output signal from previous units,
     /// and then emits input signals of the next units or update intermediate signals.
     pub fn add_update(
         &mut self,
         name: &'static str,
-        func: impl FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut) + 'static,
+        func: impl FnMut(&mut T::UnitIn, &mut T::Inter, &mut Tracer, T::UnitOut) + 'static,
     ) {
         self.updates.updates.insert(name, Box::new(func));
     }
 }
 
 /// Propagator simulates the combinational logic circuits.
-pub struct Propagator<'a, UnitIn, UnitOut, Inter> {
-    unit_in: &'a mut UnitIn,
-    context: &'a mut Inter,
-    unit_out: UnitOut,
-    updates: &'a mut PropUpdates<UnitIn, UnitOut, Inter>,
+pub struct Propagator<'a, T: CpuCircuit> {
+    unit_in: &'a mut T::UnitIn,
+    context: &'a mut T::Inter,
+    unit_out: T::UnitOut,
+    updates: &'a mut PropUpdates<T>,
     tracer: Tracer,
 }
 
-impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Propagator<'a, UnitIn, UnitOut, Inter> {
+impl<'a, T: CpuCircuit> Propagator<'a, T>
+where
+    T::UnitIn: Clone,
+    T::UnitOut: Clone,
+{
     /// Execute a combinatorial logic curcuits. See [`Propagator::add_update`].
     pub fn run_combinatorial_logic(&mut self, name: &'static str) {
         if let Some(func) = self.updates.updates.get_mut(name) {
@@ -279,38 +285,14 @@ impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Propagator<'a, UnitIn, UnitOut, I
         }
     }
     /// Get current signals.
-    pub fn signals(&self) -> (UnitIn, UnitOut) {
+    pub fn signals(&self) -> (T::UnitIn, T::UnitOut) {
         (self.unit_in.clone(), self.unit_out.clone())
     }
     /// Update signals from outputs of a unit.
-    pub fn update_from_unit_out(&mut self, unit_out: UnitOut) {
+    pub fn update_from_unit_out(&mut self, unit_out: T::UnitOut) {
         self.unit_out = unit_out
     }
-    pub fn finalize(self) -> (UnitOut, Tracer) {
+    pub fn finalize(self) -> (T::UnitOut, Tracer) {
         (self.unit_out, self.tracer)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    // use crate::propagate::{Propagator, Tracer};
-
-    // #[test]
-    // fn test() {
-    //     let mut a = 0u64;
-    //     let mut x = ();
-    //     let b = 2u64;
-    //     let updater = move |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
-    //         *a = b;
-    //     };
-    //     let updater2 = move |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
-    //         *a = *a + b;
-    //     };
-    //     let mut rcd = Propagator::new(&mut x, (), &mut a);
-    //     rcd.add_update("test", updater);
-    //     rcd.add_update("test2", updater2);
-    //     rcd.run_combinatorial_logic("test");
-    //     rcd.run_combinatorial_logic("test2");
-    //     println!("a = {}, b = {}", a, b);
-    // }
 }
