@@ -188,7 +188,7 @@ define_units! {
 }
 
 impl Units {
-    pub(crate) fn init(bin: [u8; BIN_SIZE]) -> Self {
+    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
         let cell = std::rc::Rc::new(RefCell::new(bin));
         Self {
             f: Fstage {},

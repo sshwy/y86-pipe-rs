@@ -355,6 +355,17 @@ impl HclData {
             impl crate::pipeline::Pipeline<Arch> {
                 #build_circuit_fn
                 #update_fn
+
+                pub fn new(units: Units) -> Self {
+                    Self {
+                        circuit: Self::build_circuit(),
+                        cur_inter: IntermediateSignal::default(),
+                        cur_unit_in: UnitInputSignal::default(),
+                        cur_unit_out: UnitOutputSignal::default(),
+                        units,
+                        terminate: false,
+                    }
+                }
             }
         }
     }

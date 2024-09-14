@@ -10,6 +10,7 @@ mod utils;
 #[cfg(feature = "webapp")]
 mod webapp;
 
+pub use architectures::Arch;
 pub use asm::assemble;
 pub use asm::AssembleOption;
 pub use utils::{mem_diff, mem_print};

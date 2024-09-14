@@ -6,7 +6,7 @@ mod info;
 use self::error::AppError;
 use self::info::{CycleInfo, InstInfo};
 use crate::architectures::Arch;
-use crate::pipeline::Signals;
+use crate::pipeline::{CpuArch, Signals};
 use crate::{
     assemble, object::ObjectExt, propagate::Tracer, webapp::info::StageInfo,
     DefaultPipeline as Pipeline,
@@ -45,7 +45,7 @@ impl App {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Result<App, AppError> {
         let obj = assemble(DEFAULT_SOURCE, Default::default()).context("assemble source file")?;
-        let pipe = Pipeline::init(obj.obj.binary);
+        let pipe = Pipeline::new(<Arch as CpuArch>::Units::init(obj.obj.binary));
         Ok(App {
             obj,
             pipe,

@@ -315,17 +315,6 @@ bool w_bubble = false -> i.w.bubble;
 }
 
 impl Pipeline<Arch> {
-    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
-        let units = Units::init(bin);
-        Self {
-            circuit: Pipeline::build_circuit(),
-            cur_inter: IntermediateSignal::default(),
-            cur_unit_in: UnitInputSignal::default(),
-            cur_unit_out: UnitOutputSignal::default(),
-            units,
-            terminate: false,
-        }
-    }
     pub fn step(&mut self) -> (Signals<Arch>, crate::propagate::Tracer) {
         println!("{:=^60}", " Run Cycle ");
         let (unit_out, tracer) = self.update();
@@ -429,7 +418,12 @@ regs = self.units.print_reg()
 
 #[cfg(test)]
 mod tests {
-    use crate::{architectures::Arch, asm::tests::RSUM_YS, assemble, pipeline::Pipeline};
+    use crate::{
+        architectures::{Arch, Units},
+        asm::tests::RSUM_YS,
+        assemble,
+        pipeline::Pipeline,
+    };
 
     #[test]
     fn test_hcl() {
@@ -437,7 +431,7 @@ mod tests {
         let r = assemble(RSUM_YS, crate::AssembleOption::default()).unwrap();
 
         eprintln!("{}", r);
-        let mut pipe: Pipeline<Arch> = Pipeline::init(r.obj.binary.clone());
+        let mut pipe: Pipeline<Arch> = Pipeline::new(Units::init(r.obj.binary.clone()));
         // dbg!(&pipe.graph.nodes);
         while !pipe.is_terminate() {
             let _out = pipe.step();
