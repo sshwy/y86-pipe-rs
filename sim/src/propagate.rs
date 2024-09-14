@@ -10,19 +10,12 @@ use std::{
 pub type NameList = Vec<(bool, &'static str)>;
 
 // return (receiver, producier)
-pub type Updater<'a, UnitIn, UnitOut, Inter> =
-    Box<&'a mut dyn FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut)>;
+pub type Updater<UnitIn, UnitOut, Inter> =
+    Box<dyn FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut)>;
 
 #[derive(Debug)]
-pub struct Graph {
+pub struct PropOrder {
     pub(crate) order: NameList,
-    // Node format:
-    // - `i.[fdemw].*`: stage register passin node
-    // - `o.[fdemw].*`: stage register passout node
-    // - `*`: intermediate signal node
-    // - `*.*`: regular device input/output node
-    // pub(crate) nodes: Vec<String>,
-    // pub(crate) edges: Vec<(String, String)>,
 }
 
 fn replace_abbr(abbrs: &[(&'static str, &'static str)], str: &str) -> String {
@@ -33,21 +26,6 @@ fn replace_abbr(abbrs: &[(&'static str, &'static str)], str: &str) -> String {
     }
     r
 }
-// impl Graph {
-// pub(crate) fn get_node_index(&self, name: &str) -> Option<usize> {
-//     let name = replace_abbr(&self.abbrs, name);
-//     let r = self.nodes.iter().position(|u| u.contains(&name));
-//     if r.is_some() {
-//         return r;
-//     }
-//     let r = self.nodes.iter().position(|u| name.contains(u));
-//     if r.is_some() {
-//         return r;
-//     }
-//     // eprintln!("x: {}", name);
-//     r
-// }
-// }
 
 /// Compute topological order of nodes using BFS.
 ///
@@ -91,7 +69,7 @@ pub fn topo<Node: Copy + Eq + Hash + Debug>(
 
     levels
 }
-pub struct GraphBuilder {
+pub struct PropOrderBuilder {
     runnable_nodes: NameList,
     unit_nodes: Vec<String>,
     nodes: BTreeSet<String>,
@@ -106,7 +84,7 @@ pub struct GraphBuilder {
     input_prefix: &'static str,
 }
 
-impl GraphBuilder {
+impl PropOrderBuilder {
     pub fn new(output_prefix: &'static str, input_prefix: &'static str) -> Self {
         Self {
             nodes: Default::default(),
@@ -193,7 +171,7 @@ impl GraphBuilder {
         }
     }
     /// Compute topological order of nodes.
-    pub fn build(mut self) -> Graph {
+    pub fn build(mut self) -> PropOrder {
         self.init_deps();
 
         let levels = topo(self.nodes.iter(), self.edges.iter().map(|(a, b)| (a, b)));
@@ -210,7 +188,7 @@ impl GraphBuilder {
         order.append(&mut last);
 
         // order
-        Graph { order }
+        PropOrder { order }
     }
 }
 
@@ -227,17 +205,18 @@ impl Tracer {
     }
 }
 
-pub struct Record<'a, UnitIn, UnitOut, Inter> {
+/// Propagator simulates the combinational logic circuits.
+pub struct Propagator<'a, UnitIn, UnitOut, Inter> {
     unit_in: &'a mut UnitIn,
     context: &'a mut Inter,
     unit_out: UnitOut,
-    updates: BTreeMap<&'static str, Updater<'a, UnitIn, UnitOut, Inter>>,
+    updates: BTreeMap<&'static str, Updater<UnitIn, UnitOut, Inter>>,
     tracer: Tracer,
 }
 
-impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Record<'a, UnitIn, UnitOut, Inter> {
+impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Propagator<'a, UnitIn, UnitOut, Inter> {
     pub fn new(unit_in: &'a mut UnitIn, unit_out: UnitOut, context: &'a mut Inter) -> Self {
-        Record {
+        Propagator {
             unit_in,
             unit_out,
             context,
@@ -250,11 +229,11 @@ impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Record<'a, UnitIn, UnitOut, Inter
     pub fn add_update(
         &mut self,
         name: &'static str,
-        func: &'a mut impl FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut),
+        func: impl FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut) + 'static,
     ) {
         self.updates.insert(name, Box::new(func));
     }
-    /// Execute a combinatorial logic curcuits. See [`Record::add_update`].
+    /// Execute a combinatorial logic curcuits. See [`Propagator::add_update`].
     pub fn run_combinatorial_logic(&mut self, name: &'static str) {
         if let Some(func) = self.updates.get_mut(name) {
             func(
@@ -282,22 +261,22 @@ impl<'a, UnitIn: Clone, UnitOut: Clone, Inter> Record<'a, UnitIn, UnitOut, Inter
 
 #[cfg(test)]
 mod tests {
-    use crate::record::{Record, Tracer};
+    use crate::propagate::{Propagator, Tracer};
 
     #[test]
     fn test() {
         let mut a = 0u64;
         let mut x = ();
         let b = 2u64;
-        let mut updater = |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
+        let updater = move |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
             *a = b;
         };
-        let mut updater2 = |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
+        let updater2 = move |_: &mut (), a: &mut u64, _: &mut Tracer, _| {
             *a = *a + b;
         };
-        let mut rcd = Record::new(&mut x, (), &mut a);
-        rcd.add_update("test", &mut updater);
-        rcd.add_update("test2", &mut updater2);
+        let mut rcd = Propagator::new(&mut x, (), &mut a);
+        rcd.add_update("test", updater);
+        rcd.add_update("test2", updater2);
         rcd.run_combinatorial_logic("test");
         rcd.run_combinatorial_logic("test2");
         println!("a = {}, b = {}", a, b);

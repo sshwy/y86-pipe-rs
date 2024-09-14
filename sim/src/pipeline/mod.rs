@@ -1,4 +1,4 @@
-use crate::record::Graph;
+use crate::propagate::PropOrder;
 
 pub mod hardware;
 
@@ -53,7 +53,7 @@ trait CpuSim {
 
 /// pipeline runner
 pub struct Pipeline<Sigs: Default, Units> {
-    pub(crate) graph: Graph,
+    pub(crate) graph: PropOrder,
     /// signals are returned after each step, thus set to private
     pub(crate) runtime_signals: Sigs,
     /// units are not easily made clone, thus it's up to app to decide which information to save.

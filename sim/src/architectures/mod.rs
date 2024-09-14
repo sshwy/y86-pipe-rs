@@ -10,6 +10,8 @@ hcl! {
 // "cur = pre" means: cur is the stage register in current cycle, pre is the
 // stage register in the previous cycle. In other words, pre provides signals
 // for the current cycle, and the output signals are stored in cur.
+// e.g. M.vala is the value at the start of the cycle, i.m.vala is the value
+// at the end of the cycle.
 #![stage_alias(f = F, d = D, e = E, m = M, w = W)]
 
 use crate::pipeline::Stat;
@@ -310,7 +312,7 @@ bool w_bubble = false -> i.w.bubble;
 }
 
 impl Pipeline<Signals, Units> {
-    pub fn step(&mut self) -> (Signals, crate::record::Tracer) {
+    pub fn step(&mut self) -> (Signals, crate::propagate::Tracer) {
         println!("{:=^60}", " Run Cycle ");
         let (unit_out, tracer) = self.update();
         // for stage regitsers (compute for next):

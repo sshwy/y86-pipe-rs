@@ -1,6 +1,6 @@
 use expr::LValue;
 use items::{SignalDef, SignalSourceExpr, SignalSwitch};
-use quote::{quote, ToTokens};
+use quote::{format_ident, quote, ToTokens};
 use syn::{parse::Parse, parse_quote, punctuated::Punctuated, Token};
 mod expr;
 mod items;
@@ -159,9 +159,9 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            pub(crate) fn build_graph() -> crate::record::Graph {
+            pub(crate) fn build_graph() -> crate::propagate::PropOrder {
                 // cur: o, nex: i
-                let mut g = crate::record::GraphBuilder::new("o", "i");
+                let mut g = crate::propagate::PropOrderBuilder::new("o", "i");
                 #stage_stmts
                 // hardware setup
                 hardware_setup(&mut g);
@@ -174,12 +174,17 @@ impl HclData {
         signal: &SignalDef,
         inter: &syn::Ident,
         inter_names: &[&syn::Ident],
+        stage_alias: &StageAlias,
     ) -> proc_macro2::TokenStream {
         let name = &signal.name;
+        let stage_alias = &stage_alias.0;
 
         let mapper = |mut lv: LValue| -> LValue {
             if inter_names.contains(&&lv.0[0]) {
                 lv.0.insert(0, inter.clone().into());
+            } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
+                lv.0[0] = cur.clone();
+                lv.0.insert(0, format_ident!("o"));
             }
             lv
         };
@@ -251,17 +256,19 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            let mut updater = |
-                i: &mut UnitInputSignal,
-                c: &mut IntermediateSignal,
-                tracer: &mut Tracer,
-                o: UnitOutputSignal,
-            | {
-                let mut has_tunnel_input = false;
-                #source_stmts
-                #dest_tunnel_stmts
-            };
-            rcd.add_update(stringify!(#name), &mut updater);
+            {
+                fn updater(
+                    i: &mut UnitInputSignal,
+                    c: &mut IntermediateSignal,
+                    tracer: &mut Tracer,
+                    o: UnitOutputSignal,
+                ) {
+                    let mut has_tunnel_input = false;
+                    #source_stmts
+                    #dest_tunnel_stmts
+                };
+                rcd.add_update(stringify!(#name), updater);
+            }
         }
     }
     fn render_update(&self) -> proc_macro2::TokenStream {
@@ -271,45 +278,31 @@ impl HclData {
             .iter()
             .map(|s| &s.name)
             .collect::<Vec<_>>();
-        let stage_alias_stmts = self
-            .stage_alias
-            .0
-            .iter()
-            .map(|(cur, pre)| {
-                quote! {
-                    let #pre = o.#cur.clone();
-                }
-            })
-            .reduce(|a, b| quote! { #a #b })
-            .unwrap_or_default();
 
         let updaters_stmt = self
             .intermediate_signals
             .iter()
-            .map(|s| HclData::render_signal_updater(s, inter, &inter_names))
+            .map(|s| HclData::render_signal_updater(s, inter, &inter_names, &self.stage_alias))
             .reduce(|a, b| quote! { #a #b })
             .unwrap_or_default();
 
         quote! {
             #[allow(unused)]
             #[allow(non_snake_case)]
-            fn update(&mut self) -> (UnitOutputSignal, crate::record::Tracer) {
+            fn update(&mut self) -> (UnitOutputSignal, crate::propagate::Tracer) {
                 let #inter = &mut self.runtime_signals.2;
                 let i = &mut self.runtime_signals.0;
                 let o = self.runtime_signals.1.clone();
-                let units = &mut self.units;
 
                 use crate::isa::inst_code::*;
                 use crate::isa::reg_code::*;
                 use crate::isa::op_code::*;
-
-                #stage_alias_stmts
-
-                use crate::record::*;
-                let mut rcd = Record::new(i, o, c);
+                use crate::propagate::*;
+                let mut rcd = Propagator::new(i, o, c);
 
                 #updaters_stmt
 
+                let units = &mut self.units;
                 for (is_unit, name) in &self.graph.order {
                     if *is_unit {
                         let (mut unit_in, mut unit_out) = rcd.signals();
