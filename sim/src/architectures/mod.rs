@@ -311,7 +311,16 @@ bool w_stall = W.stat in { Adr, Ins, Hlt } -> i.w.stall;
 bool w_bubble = false -> i.w.bubble;
 }
 
-impl Pipeline<Signals, Units> {
+impl Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
+        let units = Units::init(bin);
+        Self {
+            circuit: Pipeline::build_circuit(),
+            runtime_signals: Signals::default(),
+            units,
+            terminate: false,
+        }
+    }
     pub fn step(&mut self) -> (Signals, crate::propagate::Tracer) {
         println!("{:=^60}", " Run Cycle ");
         let (unit_out, tracer) = self.update();
@@ -378,7 +387,7 @@ use crate::isa::{inst_code, reg_code};
 use ansi_term::Colour::{Red, Green};
 
 use super::*;
-impl Pipeline<Signals, Units> {
+impl Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
     // print state at the beginning of a cycle
     pub fn print_state(&self) {
         // For stage registers, outputs contains information for the following cycle
@@ -424,7 +433,7 @@ regs = self.units.print_reg()
 #[cfg(test)]
 mod tests {
     use crate::{
-        architectures::Signals,
+        architectures::{IntermediateSignal, Signals, UnitInputSignal, UnitOutputSignal},
         asm::tests::RSUM_YS,
         assemble,
         pipeline::{hardware::Units, Pipeline},
@@ -436,7 +445,7 @@ mod tests {
         let r = assemble(RSUM_YS, crate::AssembleOption::default()).unwrap();
 
         eprintln!("{}", r);
-        let mut pipe: Pipeline<Signals, Units> = Pipeline::init(r.obj.binary.clone());
+        let mut pipe: Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> = Pipeline::init(r.obj.binary.clone());
         // dbg!(&pipe.graph.nodes);
         while !pipe.is_terminate() {
             let _out = pipe.step();

@@ -115,7 +115,7 @@ impl HclData {
             }
         }
     }
-    fn render_build_graph(&self) -> proc_macro2::TokenStream {
+    fn render_build_circuit(&self) -> proc_macro2::TokenStream {
         let stage_stmts = self
             .stage_alias
             .0
@@ -158,15 +158,40 @@ impl HclData {
             .reduce(|a, b| quote! { #a #b })
             .unwrap_or_default();
 
+        let inter = &quote::format_ident!("c");
+        let inter_names = self
+            .intermediate_signals
+            .iter()
+            .map(|s| &s.name)
+            .collect::<Vec<_>>();
+        let updaters_stmt = self
+            .intermediate_signals
+            .iter()
+            .map(|s| HclData::render_signal_updater(s, inter, &inter_names, &self.stage_alias))
+            .reduce(|a, b| quote! { #a #b })
+            .unwrap_or_default();
+
         quote! {
-            pub(crate) fn build_graph() -> crate::propagate::PropOrder {
+            pub(crate) fn build_circuit() -> crate::propagate::PropCircuit<UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+                use crate::propagate::*;
+
                 // cur: o, nex: i
-                let mut g = crate::propagate::PropOrderBuilder::new("o", "i");
-                #stage_stmts
-                // hardware setup
-                hardware_setup(&mut g);
-                #stmts
-                g.build()
+                let order = {
+                    let mut g = PropOrderBuilder::new("o", "i");
+                    #stage_stmts
+                    // hardware setup
+                    hardware_setup(&mut g);
+                    #stmts
+                    g.build()
+                };
+
+                use crate::isa::inst_code::*;
+                use crate::isa::reg_code::*;
+                use crate::isa::op_code::*;
+
+                let mut circuit = PropCircuit::new(order);
+                #updaters_stmt
+                circuit
             }
         }
     }
@@ -267,43 +292,22 @@ impl HclData {
                     #source_stmts
                     #dest_tunnel_stmts
                 };
-                rcd.add_update(stringify!(#name), updater);
+                circuit.add_update(stringify!(#name), updater);
             }
         }
     }
     fn render_update(&self) -> proc_macro2::TokenStream {
-        let inter = &quote::format_ident!("c");
-        let inter_names = self
-            .intermediate_signals
-            .iter()
-            .map(|s| &s.name)
-            .collect::<Vec<_>>();
-
-        let updaters_stmt = self
-            .intermediate_signals
-            .iter()
-            .map(|s| HclData::render_signal_updater(s, inter, &inter_names, &self.stage_alias))
-            .reduce(|a, b| quote! { #a #b })
-            .unwrap_or_default();
-
         quote! {
             #[allow(unused)]
             #[allow(non_snake_case)]
             fn update(&mut self) -> (UnitOutputSignal, crate::propagate::Tracer) {
-                let #inter = &mut self.runtime_signals.2;
+                let c = &mut self.runtime_signals.2;
                 let i = &mut self.runtime_signals.0;
                 let o = self.runtime_signals.1.clone();
 
-                use crate::isa::inst_code::*;
-                use crate::isa::reg_code::*;
-                use crate::isa::op_code::*;
-                use crate::propagate::*;
-                let mut rcd = Propagator::new(i, o, c);
-
-                #updaters_stmt
-
+                let mut rcd = self.circuit.updates.make_propagator(i, o, c);
                 let units = &mut self.units;
-                for (is_unit, name) in &self.graph.order {
+                for (is_unit, name) in &self.circuit.order.order {
                     if *is_unit {
                         let (mut unit_in, mut unit_out) = rcd.signals();
                         units.run(name, (unit_in, &mut unit_out));
@@ -326,7 +330,7 @@ impl HclData {
             .unwrap_or_default();
 
         let intermediate_signal_struct = self.render_intermediate_signal_struct();
-        let build_graph_fn = self.render_build_graph();
+        let build_circuit_fn = self.render_build_circuit();
         let update_fn = self.render_update();
 
         quote! {
@@ -338,8 +342,8 @@ impl HclData {
             #[allow(unused)]
             pub type Signals = (UnitInputSignal, UnitOutputSignal, IntermediateSignal);
 
-            impl crate::pipeline::Pipeline<Signals, Units> {
-                #build_graph_fn
+            impl crate::pipeline::Pipeline<Signals, Units, UnitInputSignal, UnitOutputSignal, IntermediateSignal> {
+                #build_circuit_fn
                 #update_fn
             }
         }

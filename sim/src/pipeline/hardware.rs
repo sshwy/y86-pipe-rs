@@ -228,15 +228,3 @@ impl Units {
         )
     }
 }
-
-impl<Sigs: Default> super::Pipeline<Sigs, Units> {
-    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
-        let units = Units::init(bin);
-        Self {
-            graph: super::Pipeline::build_graph(),
-            runtime_signals: Sigs::default(),
-            units,
-            terminate: false,
-        }
-    }
-}

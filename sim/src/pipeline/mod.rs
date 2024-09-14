@@ -1,4 +1,4 @@
-use crate::propagate::PropOrder;
+use crate::propagate::PropCircuit;
 
 pub mod hardware;
 
@@ -52,8 +52,8 @@ trait CpuSim {
 }
 
 /// pipeline runner
-pub struct Pipeline<Sigs: Default, Units> {
-    pub(crate) graph: PropOrder,
+pub struct Pipeline<Sigs: Default, Units, UnitIn, UnitOut, Inter> {
+    pub(crate) circuit: PropCircuit<UnitIn, UnitOut, Inter>,
     /// signals are returned after each step, thus set to private
     pub(crate) runtime_signals: Sigs,
     /// units are not easily made clone, thus it's up to app to decide which information to save.
@@ -62,7 +62,7 @@ pub struct Pipeline<Sigs: Default, Units> {
     pub(crate) terminate: bool,
 }
 
-impl<Sig: Default, Units> Pipeline<Sig, Units> {
+impl<Sig: Default, Units, UnitIn, UnitOut, Inter> Pipeline<Sig, Units, UnitIn, UnitOut, Inter> {
     pub fn is_terminate(&self) -> bool {
         self.terminate
     }
