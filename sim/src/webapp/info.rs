@@ -1,6 +1,6 @@
 //! data records during execution
 
-use crate::{architectures::Arch, object::SourceInfo, pipeline::Signals};
+use crate::{architectures::pipe_full::Arch, object::SourceInfo, pipeline::Signals};
 use anyhow::Result;
 use wasm_bindgen::prelude::*;
 

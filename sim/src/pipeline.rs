@@ -1,7 +1,5 @@
 use crate::propagate::PropCircuit;
 
-pub mod hardware;
-
 /// Pipeline State
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 #[cfg_attr(feature = "webapp", wasm_bindgen::prelude::wasm_bindgen)]

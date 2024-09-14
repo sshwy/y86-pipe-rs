@@ -3,12 +3,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::Stat;
 use crate::isa::cond_fn::*;
 use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
 use crate::isa::reg_code;
 use crate::isa::reg_code::*;
+use crate::pipeline::Stat;
 use crate::{
     define_units,
     isa::BIN_SIZE,
