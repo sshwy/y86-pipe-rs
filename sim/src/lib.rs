@@ -1,8 +1,9 @@
+mod architectures;
 mod asm;
 mod dsl;
-mod isa;
+pub mod isa;
 mod object;
-mod pipeline;
+pub mod pipeline;
 mod record;
 mod utils;
 
@@ -13,8 +14,7 @@ pub use asm::assemble;
 pub use asm::AssembleOption;
 pub use utils::{mem_diff, mem_print};
 
-pub type DefaultPipeline =
-    pipeline::Pipeline<pipeline::pipe_full::Signals, pipeline::hardware::Units>;
+pub type DefaultPipeline = pipeline::Pipeline<architectures::Signals, pipeline::hardware::Units>;
 
 #[cfg(test)]
 mod tests {

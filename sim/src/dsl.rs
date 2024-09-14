@@ -26,7 +26,8 @@ macro_rules! define_units {
             $($sname:ident : $stype:ty),* $(,)?
         } $($body:block)?
     )*) => {
-        pub mod unit_sig_in {
+        /// Input signals of units
+        pub mod unit_in {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Default, Debug, Clone)]
@@ -36,7 +37,8 @@ macro_rules! define_units {
                 $($(pub $pname: $ptype, )*)?
             })*
         }
-        pub mod unit_sig_out {
+        /// Output signals of units
+        pub mod unit_out {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Debug, Clone)]
@@ -54,15 +56,32 @@ macro_rules! define_units {
                 }
             })*
         }
+        /// Signals stored in stage units
+        pub mod unit_stage {
+            #![allow(unused_imports)]
+            use super::*;
+            $(#[derive(Debug, Clone)]
+            #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
+            pub struct $unit_name {
+                $($(pub $pname: $ptype, )*)?
+            }
+            impl Default for $unit_name {
+                fn default() -> Self {
+                    Self {
+                        $($($pname: $pdefault, )*)?
+                    }
+                }
+            })*
+        }
         #[derive(Default, Debug, Clone)]
         #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
         pub struct UnitInputSignal {
-            $(pub $unit_short_name: unit_sig_in::$unit_name),*
+            $(pub $unit_short_name: unit_in::$unit_name),*
         }
         #[derive(Default, Debug, Clone)]
         #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
         pub struct UnitOutputSignal {
-            $(pub $unit_short_name: unit_sig_out::$unit_name),*
+            $(pub $unit_short_name: unit_out::$unit_name),*
         }
 
         /// A unit simulates a circuit in the CPU. It receives signals from
@@ -82,11 +101,11 @@ macro_rules! define_units {
         $( impl $unit_name {
             #[allow(unused)]
             pub fn trigger(Self{ $( $sname ),* }: &mut Self,
-                inputs: unit_sig_in::$unit_name,
-                outputs: &mut unit_sig_out::$unit_name,
+                inputs: unit_in::$unit_name,
+                outputs: &mut unit_out::$unit_name,
             ) {
-                let unit_sig_in::$unit_name{$($( $iname, )*)? .. } = inputs;
-                let unit_sig_out::$unit_name{$($( $oname, )*)? .. } = outputs;
+                let unit_in::$unit_name{$($( $iname, )*)? .. } = inputs;
+                let unit_out::$unit_name{$($( $oname, )*)? .. } = outputs;
 
                 $(
                     if inputs.bubble {
@@ -149,153 +168,4 @@ pub(crate) fn mtc<T: Eq>(sig: T, choice: impl AsRef<[T]>) -> bool {
         }
     }
     false
-}
-
-/// This macro minics the HCL language syntax to define hardware control logic.
-/// See `pipe_full.rs` for an example
-#[macro_export]
-macro_rules! hcl {
-    {
-        // heads
-        @hardware $hardware:path;
-        @unit_input $nex:ident;
-        @unit_output $cur:ident;
-        @intermediate $inter:ident;
-        @abbr $fstage:ident $dstage:ident $estage:ident $mstage:ident $wstage:ident;
-
-        $( @use $uty:path; )*
-
-        // intermediate values
-        $(
-            // output intermediate value name and type
-            $cvar:ident $cty:ty
-
-            // select from cases
-            $(= [
-                // can have multiple tunnel to trigger
-                $($cond:expr => $val:expr; $( @$tun:ident )*)*
-            ])?
-            $(:= $final:expr $(, @$tun_final:ident )?)?
-            $(=> $to:expr $(, @$tun_to:ident )?)*
-            ;
-        )*
-
-        // tunnel visualizations. computations are performed at the end of cycle
-        // before stage register update
-        $(@tunnel $id:literal)*
-    } => {
-        #[allow(unused_imports)]
-        $( use $uty; )*
-
-        #[derive(Debug, Default, Clone)]
-        #[allow(unused)]
-        #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
-        pub struct IntermediateSignal {
-            $( pub $cvar: $cty, )*
-        }
-
-        use $hardware::*;
-
-        #[allow(unused)]
-        pub type Signals = (UnitInputSignal, UnitOutputSignal, IntermediateSignal);
-
-        impl $crate::pipeline::Pipeline<Signals, Units> {
-            fn build_graph() -> $crate::record::Graph {
-                let mut g = $crate::record::GraphBuilder::new(stringify!($cur), stringify!($nex));
-                g.add_stage_output(concat!(stringify!($cur), ".f"), stringify!($fstage));
-                g.add_stage_output(concat!(stringify!($cur), ".d"), stringify!($dstage));
-                g.add_stage_output(concat!(stringify!($cur), ".e"), stringify!($estage));
-                g.add_stage_output(concat!(stringify!($cur), ".m"), stringify!($mstage));
-                g.add_stage_output(concat!(stringify!($cur), ".w"), stringify!($wstage));
-
-                // hardware setup
-                hardware_setup(&mut g);
-
-                $(
-                    $(
-                        g.add_update(
-                            stringify!($cvar), concat!($( concat!(
-                                stringify!($cond), ";",
-                                stringify!($val), ";",
-                            ) ),*),
-                        );
-                    )?
-                    $(
-                        g.add_update(
-                            stringify!($cvar), stringify!($final),
-                        );
-                    )?
-                    $( g.add_rev_deps(stringify!( $cvar ), stringify!( $to )); )*
-                )*
-
-                g.build()
-            }
-            #[allow(unused)]
-            #[allow(non_snake_case)]
-            fn update(&mut self) -> (UnitOutputSignal, $crate::record::Tracer) {
-                let $inter = &mut self.runtime_signals.2;
-                let $nex = &mut self.runtime_signals.0;
-                let $cur = self.runtime_signals.1.clone();
-                let units = &mut self.units;
-
-                use $crate::isa::inst_code::*;
-                use $crate::isa::reg_code::*;
-                use $crate::isa::op_code::*;
-                use $crate::dsl::mtc;
-                let $fstage = $cur.f.clone();
-                let $dstage = $cur.d.clone();
-                let $estage = $cur.e.clone();
-                let $mstage = $cur.m.clone();
-                let $wstage = $cur.w.clone();
-
-                use $crate::record::*;
-                let mut rcd = Record::new($nex, $cur, $inter);
-
-                $( let mut updater = |
-                    $nex: &mut UnitInputSignal,
-                    $inter: &mut IntermediateSignal,
-                    tracer: &mut Tracer,
-                    $cur: UnitOutputSignal,
-                | {
-                    let mut has_tunnel_input = false;
-                    $(
-                        $(if (u8::from($cond)) != 0 {
-                            $inter.$cvar = $val;
-                            $(
-                                has_tunnel_input = true;
-                                eprintln!("{}", ansi_term::Colour::Green.bold().paint(stringify!($tun)));
-                                tracer.trigger_tunnel(stringify!($tun));
-                            )*
-                        })else*
-                    )?
-                    $( $inter.$cvar = $final;
-                        $(
-                            eprintln!("{}", ansi_term::Colour::Blue.bold().paint(stringify!($tun_final)));
-                            tracer.trigger_tunnel(stringify!($tun_final));
-                            has_tunnel_input = true;
-                        )?
-                    )?
-                    $(
-                        $to = $inter.$cvar.to_owned();
-                        if has_tunnel_input {
-                            $( eprintln!("{}", ansi_term::Colour::Blue.bold().paint(stringify!($tun_to)));
-                            tracer.trigger_tunnel(stringify!($tun_to));)?
-                        }
-                    )*
-                };
-                rcd.add_update(stringify!($cvar), &mut updater); )*
-
-                for (is_unit, name) in &self.graph.order {
-                    if *is_unit {
-                        let (mut unit_in, mut unit_out) = rcd.signals();
-                        units.run(name, (unit_in, &mut unit_out));
-                        rcd.update_from_unit_out(unit_out)
-                    } else { // combinatorial logics do not change output (cur)
-                        rcd.run_combinatorial_logic(name);
-                    }
-                }
-                rcd.finalize()
-            }
-        }
-    };
 }

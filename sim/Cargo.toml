@@ -21,6 +21,7 @@ clap = { version = "4.4.8", features = ["derive"] }
 pest = "2.7.5"
 pest_derive = "2.7.5"
 regex = "1.10.2"
+hcl_macro = { path = "../hcl_macro" }
 
 wasm-bindgen = { version = "0.2.88", optional = true }
 serde-wasm-bindgen = { version = "0.4", optional = true }

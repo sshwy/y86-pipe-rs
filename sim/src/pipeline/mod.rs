@@ -1,9 +1,8 @@
 use crate::record::Graph;
 
 pub mod hardware;
-pub mod pipe_full;
 
-/// Pipeline Pipeline State
+/// Pipeline State
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 #[cfg_attr(feature = "webapp", wasm_bindgen::prelude::wasm_bindgen)]
 #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
@@ -25,15 +24,42 @@ impl Default for Stat {
     }
 }
 
+pub enum CpuStatus {
+    CycleStart,
+    CycleEnd,
+}
+
+/// During a CPU cycle, signals in memory devices (stage units) are propagated through
+/// the combinational logic circuits. The signals are then latched into the pipeline
+/// registers at the end of the cycle. Therefore we can use two basic operations to
+/// simulate the pipeline.
+trait CpuSim {
+    type UnitInputSignals;
+    type UnitOutputSignals;
+    /// In the pipeline, we have specific memory devices to store data.
+    /// Stage data are signals that passed between CPU cycles.
+    type StageData;
+
+    /// Initiate the next cycle or the first cycle. This function should be called
+    /// at the very beginning of the simulation, or after calling [`CpuSim::propagate_signals`].
+    /// Otherwise the behavior is undefined.
+    fn initiate_next_cycle(&mut self);
+
+    /// Propagate signals through the combinational logic circuits. This function
+    /// should be called after [`CpuSim::initiate_next_cycle`]. Otherwise the
+    /// behavior is undefined.
+    fn propagate_signals(&mut self);
+}
+
 /// pipeline runner
 pub struct Pipeline<Sigs: Default, Units> {
     pub(crate) graph: Graph,
     /// signals are returned after each step, thus set to private
-    runtime_signals: Sigs,
+    pub(crate) runtime_signals: Sigs,
     /// units are not easily made clone, thus it's up to app to decide which information to save.
     pub(crate) units: Units,
     /// we have [`is_terminate`]
-    terminate: bool,
+    pub(crate) terminate: bool,
 }
 
 impl<Sig: Default, Units> Pipeline<Sig, Units> {

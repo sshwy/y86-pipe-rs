@@ -1,9 +1,6 @@
-use std::str::FromStr;
-
 use crate::expr;
 use expr::LValue;
-use quote::{quote, ToTokens};
-use syn::{parse::Parse, parse_quote, punctuated::Punctuated, Token};
+use syn::{parse::Parse, punctuated::Punctuated, Token};
 
 /// e.g. `imem.error => NOP`
 #[derive(Debug)]
@@ -132,7 +129,7 @@ impl Parse for SignalDest {
 }
 
 /// e.g.
-/// ```no-run
+/// ```plain
 /// u8 f_icode = [
 ///     imem.error => NOP;
 ///     1 => imem.icode;

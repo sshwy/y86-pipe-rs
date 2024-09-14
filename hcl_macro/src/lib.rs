@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use expr::LValue;
 use items::{SignalDef, SignalSourceExpr, SignalSwitch};
 use quote::{quote, ToTokens};
@@ -161,7 +159,7 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            fn build_graph() -> crate::record::Graph {
+            pub(crate) fn build_graph() -> crate::record::Graph {
                 // cur: o, nex: i
                 let mut g = crate::record::GraphBuilder::new("o", "i");
                 #stage_stmts

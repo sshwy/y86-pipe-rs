@@ -1,7 +1,7 @@
 //! Expression in CS:APP HCL language
 
 use quote::ToTokens;
-use syn::{parse::Parse, punctuated::Punctuated, spanned::Spanned, Token};
+use syn::{parse::Parse, punctuated::Punctuated, Token};
 
 #[derive(Debug, Clone)]
 pub struct LValue(pub Punctuated<syn::Ident, Token![.]>);
