@@ -14,7 +14,6 @@ name = "yars"
 path = "src/main.rs"
 
 [dependencies]
-ansi_term = "0.12"
 anyhow = "1.0"
 pest = "2.7"
 pest_derive = "2.7"

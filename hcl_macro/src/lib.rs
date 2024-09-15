@@ -188,6 +188,7 @@ impl HclData {
                 use crate::isa::inst_code::*;
                 use crate::isa::reg_code::*;
                 use crate::isa::op_code::*;
+                use binutils::clap::builder::styling::*;
 
                 let mut circuit = PropCircuit::new(order);
                 #updaters_stmt
@@ -224,7 +225,8 @@ impl HclData {
                         .map(|tunnel| {
                             quote! {
                                 has_tunnel_input = true;
-                                eprintln!("{}", ansi_term::Colour::Green.bold().paint(stringify!(#tunnel)));
+                                let s = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+                                eprintln!("{s}{}{s:#}", stringify!(#tunnel));
                                 tracer.trigger_tunnel(stringify!(#tunnel));
                             }
                         });
@@ -246,7 +248,8 @@ impl HclData {
                 let tunnel_stmts = tunnel.as_ref().cloned().map(|tunnel| {
                     quote! {
                         has_tunnel_input = true;
-                        eprintln!("{}", ansi_term::Colour::Green.bold().paint(stringify!(#tunnel)));
+                        let s = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+                        eprintln!("{s}{}{s:#}", stringify!(#tunnel));
                         tracer.trigger_tunnel(stringify!(#tunnel));
                     }
                 });
@@ -267,7 +270,8 @@ impl HclData {
                     quote! {
                         #dst = c.#name.to_owned();
                         if has_tunnel_input {
-                            eprintln!("{}", ansi_term::Colour::Green.bold().paint(stringify!(#tunnel)));
+                            let s = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+                            eprintln!("{s}{}{s:#}", stringify!(#tunnel));
                             tracer.trigger_tunnel(stringify!(#tunnel));
                         }
                     }
