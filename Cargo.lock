@@ -163,6 +163,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "dap-types"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ac6ec62ed0beeca294d83389461ba6a2ff29e9f531cbacb9d98c4ffedac9339"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "debugger"
+version = "0.1.0"
+dependencies = [
+ "binutils",
+ "dap-types",
+ "y86-sim",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -729,7 +748,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
-name = "y86-pipe-rs"
+name = "y86-sim"
 version = "0.1.0"
 dependencies = [
  "anyhow",

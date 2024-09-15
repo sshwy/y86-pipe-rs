@@ -1,0 +1,15 @@
+[package]
+name = "debugger"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "ydb"
+path = "src/main.rs"
+
+[dependencies]
+dap-types = "0.0.1"
+binutils = { path = "../binutils" }
+y86-sim = { path = "../sim" }

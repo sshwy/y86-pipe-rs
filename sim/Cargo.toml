@@ -1,14 +1,13 @@
 [package]
-name = "y86-pipe-rs"
+name = "y86-sim"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Y86 simulator rust implementation"
+description = "Y86 simulator written in Rust"
 authors = ["Weiyao Huang <jy.cat@qq.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-# Example of customizing binaries in Cargo.toml.
 [[bin]]
 name = "yars"
 path = "src/main.rs"

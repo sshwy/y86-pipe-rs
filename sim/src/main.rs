@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use binutils::clap;
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use y86_pipe_rs::{
+use y86_sim::{
     assemble, mem_diff,
     pipeline::{CpuArch, Simulator},
     Arch, AssembleOption,
