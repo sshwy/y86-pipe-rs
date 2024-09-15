@@ -363,7 +363,7 @@ impl HclData {
                         cur_unit_in: UnitInputSignal::default(),
                         cur_unit_out: UnitOutputSignal::default(),
                         units,
-                        terminate: false,
+                        terminate: None,
                     }
                 }
             }

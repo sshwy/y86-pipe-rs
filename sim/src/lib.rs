@@ -12,8 +12,6 @@ pub use asm::AssembleOption;
 pub use utils::{mem_diff, mem_print};
 pub use object::ObjectExt;
 
-pub type DefaultPipeline = pipeline::Simulator<architectures::pipe_full::Arch>;
-
 #[cfg(test)]
 mod tests {
     use crate::{assemble, isa::BIN_SIZE, AssembleOption};

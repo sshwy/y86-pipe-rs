@@ -5,7 +5,6 @@ edition = "2021"
 license = "MIT"
 description = "Y86 simulator rust implementation"
 authors = ["Weiyao Huang <jy.cat@qq.com>"]
-repository = "https://github.com/sshwy/y86-pipe-rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -17,11 +16,12 @@ path = "src/main.rs"
 [dependencies]
 ansi_term = "0.12"
 anyhow = "1.0"
-clap = { version = "4.5", features = ["derive"] }
 pest = "2.7"
 pest_derive = "2.7"
 regex = "1.10"
 hcl_macro = { path = "../hcl_macro" }
+interpolator = "0.5.0"
+binutils = { path = "../binutils" }
 
 serde = { version = "1.0", features = ["derive"], optional = true }
 

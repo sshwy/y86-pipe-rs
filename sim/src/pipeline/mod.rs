@@ -46,6 +46,13 @@ pub type Signals<A> = (
     <A as CpuCircuit>::Inter,
 );
 
+pub enum Termination {
+    /// Successfully halt
+    Halt,
+    /// Halt with error
+    Error,
+}
+
 /// pipeline simulator
 pub struct Simulator<T: CpuArch> {
     pub(crate) circuit: PropCircuit<T>,
@@ -56,11 +63,15 @@ pub struct Simulator<T: CpuArch> {
     /// units are not easily made clone, thus it's up to app to decide which information to save.
     pub(crate) units: T::Units,
     /// we have [`is_terminate`]
-    pub(crate) terminate: bool,
+    pub(crate) terminate: Option<Termination>,
 }
 
 impl<T: CpuArch> Simulator<T> {
     pub fn is_terminate(&self) -> bool {
-        self.terminate
+        self.terminate.is_some()
+    }
+    /// Whether the simulation is successfully halted
+    pub fn is_success(&self) -> bool {
+        matches!(self.terminate, Some(Termination::Halt))
     }
 }

@@ -1,4 +1,10 @@
 [workspace]
-
 resolver = "2"
-members = [ "hcl_macro", "sim", ]
+members = [ "binutils", "hcl_macro", "sim" ]
+
+[workspace.package]
+repository = "https://github.com/sshwy/y86-pipe-rs"
+
+[workspace.dependencies]
+tempfile = "3.12.0"
+tracing = "0.1"

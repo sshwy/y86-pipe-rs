@@ -1,12 +1,15 @@
 use anyhow::{Context, Result};
+use binutils::clap;
 use clap::{error::ErrorKind, CommandFactory, Parser};
 use y86_pipe_rs::{
-    assemble, mem_diff, pipeline::CpuArch, Arch, AssembleOption, DefaultPipeline as Simulator,
+    assemble, mem_diff,
+    pipeline::{CpuArch, Simulator},
+    Arch, AssembleOption,
 };
 
 // Y86 assembler and pipeline simulator written in rust
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, styles = binutils::get_styles())]
 struct Args {
     /// input file path
     input: String,
