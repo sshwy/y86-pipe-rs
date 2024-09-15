@@ -1,4 +1,4 @@
-use crate::object::BIN_SIZE;
+use crate::object::MEM_SIZE;
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {
@@ -25,8 +25,8 @@ pub fn put_u64(binary: &mut [u8], val: u64) {
     }
 }
 
-pub fn mem_diff(left: &[u8; BIN_SIZE], right: &[u8; BIN_SIZE]) {
-    for i in 0..BIN_SIZE >> 3 {
+pub fn mem_diff(left: &[u8; MEM_SIZE], right: &[u8; MEM_SIZE]) {
+    for i in 0..MEM_SIZE >> 3 {
         if get_u64(&left[i << 3..]) != get_u64(&right[i << 3..]) {
             print!("{:#06x}: ", i << 3,);
             for byte in left[i << 3..].iter().take(8) {
@@ -41,9 +41,9 @@ pub fn mem_diff(left: &[u8; BIN_SIZE], right: &[u8; BIN_SIZE]) {
     }
 }
 
-pub fn mem_print(bin: &[u8; BIN_SIZE]) {
+pub fn mem_print(bin: &[u8; MEM_SIZE]) {
     let mut max_i = 0;
-    for i in 0..BIN_SIZE >> 3 {
+    for i in 0..MEM_SIZE >> 3 {
         if get_u64(&bin[i << 3..]) != 0 {
             max_i = i;
         }

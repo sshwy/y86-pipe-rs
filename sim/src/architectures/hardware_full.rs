@@ -10,7 +10,7 @@ use crate::isa::reg_code;
 use crate::isa::reg_code::*;
 use crate::{
     define_units,
-    object::BIN_SIZE,
+    object::MEM_SIZE,
     utils::{get_u64, put_u64},
 };
 
@@ -76,10 +76,10 @@ define_units! {
     InstructionMemory imem { // with split
         .input(pc: u64)
         .output(error: bool, icode: u8, ifun: u8, align: [u8; 9])
-        binary: Rc<RefCell<[u8; BIN_SIZE]>>
+        binary: Rc<RefCell<[u8; MEM_SIZE]>>
     } {
-        let binary: &[u8; BIN_SIZE] = &binary.borrow();
-        if pc + 10 > BIN_SIZE as u64 {
+        let binary: &[u8; MEM_SIZE] = &binary.borrow();
+        if pc + 10 > MEM_SIZE as u64 {
             *error = true;
         } else {
             let pc = pc as usize;
@@ -200,9 +200,9 @@ define_units! {
             /// Indicate if the address is invalid.
             error: bool
         )
-        binary: Rc<RefCell<[u8; BIN_SIZE]>>
+        binary: Rc<RefCell<[u8; MEM_SIZE]>>
     } {
-        if addr + 8 >= BIN_SIZE as u64 {
+        if addr + 8 >= MEM_SIZE as u64 {
             *dataout = 0;
             *error = true;
             return
@@ -220,8 +220,9 @@ define_units! {
 }
 
 impl Units {
-    pub fn init(bin: [u8; BIN_SIZE]) -> Self {
-        let cell = std::rc::Rc::new(RefCell::new(bin));
+    /// Init CPU harewre with given memory.
+    pub fn init(memory: [u8; MEM_SIZE]) -> Self {
+        let cell = std::rc::Rc::new(RefCell::new(memory));
         Self {
             f: Fstage {},
             d: Dstage {},
@@ -244,7 +245,7 @@ impl Units {
             dmem: DataMemory { binary: cell },
         }
     }
-    pub(crate) fn mem(&self) -> [u8; BIN_SIZE] {
+    pub(crate) fn mem(&self) -> [u8; MEM_SIZE] {
         *self.dmem.binary.borrow()
     }
     pub(crate) fn print_reg(&self) -> String {

@@ -68,13 +68,13 @@ fn main() -> Result<()> {
             )
             .exit();
         }
-        let mut pipe = Simulator::new(<Arch as CpuArch>::Units::init(obj.obj.binary), true);
+        let mut pipe = Simulator::new(<Arch as CpuArch>::Units::init(obj.obj.init_mem()), true);
 
         while !pipe.is_terminate() {
             let _out = pipe.step();
         }
 
-        mem_diff(&obj.obj.binary, &pipe.mem());
+        mem_diff(&obj.obj.init_mem(), &pipe.mem());
         // mem_print(&pipe.mem());
     } else {
         let output_path = if let Some(path) = args.output {

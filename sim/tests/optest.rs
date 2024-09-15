@@ -49,7 +49,7 @@ fn test_reg_op() -> anyhow::Result<()> {
                 let obj = make_obj(&src)?;
                 let mut pipe = y86_sim::pipeline::Simulator::new(
                     <y86_sim::Arch as y86_sim::pipeline::CpuArch>::Units::init(
-                        obj.obj.binary,
+                        obj.obj.init_mem(),
                     ),
                     false,
                 );

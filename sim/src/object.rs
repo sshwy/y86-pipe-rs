@@ -3,8 +3,13 @@
 use crate::asm::{self, Reg};
 use std::{collections::BTreeMap, fmt::Display};
 
-/// Maximum size of output object binary data (64KB)
-pub const BIN_SIZE: usize = 1 << 16;
+/// Size of the memory that is used to store instructions and data (stack).
+/// No matter what architecture we are using, memory store must exist. Otherwise
+/// we have no place to store instructions.
+pub const MEM_SIZE: usize = 1 << 20;
+
+/// Maximum size of the assembled binary.
+const BIN_SIZE: usize = 1 << 16;
 
 type SymbolMap = BTreeMap<String, u64>;
 
@@ -120,7 +125,7 @@ pub struct SourceInfo {
 ///
 /// while y86 language support 64-bit address, we only consider address < 0x10000.
 pub struct Object {
-    pub binary: [u8; BIN_SIZE],
+    binary: [u8; BIN_SIZE],
     /// basically labels
     pub symbols: SymbolMap,
 }
@@ -131,6 +136,12 @@ impl Object {
             let byte = (data >> (i * 8) & 0xff) as u8;
             self.binary[addr + i] = byte // little endian
         }
+    }
+    /// Initialize memory from assembled binary.
+    pub fn init_mem(&self) -> [u8; MEM_SIZE] {
+        let mut mem = [0; MEM_SIZE];
+        mem[..self.binary.len()].copy_from_slice(&self.binary);
+        mem
     }
 }
 
