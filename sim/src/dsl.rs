@@ -31,7 +31,7 @@ macro_rules! define_units {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Default, Debug, Clone)]
-            #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
+            #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
                 $($(pub $iname: $itype, )*)?
                 $($(pub $pname: $ptype, )*)?
@@ -42,7 +42,7 @@ macro_rules! define_units {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Debug, Clone)]
-            #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
+            #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
                 $($(pub $oname: $otype, )*)?
                 $($(pub $pname: $ptype, )*)?
@@ -62,7 +62,7 @@ macro_rules! define_units {
             #![allow(unused_imports)]
             use super::*;
             $(#[derive(Debug, Clone)]
-            #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
+            #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
                 $($(pub $pname: $ptype, )*)?
             }
@@ -78,12 +78,12 @@ macro_rules! define_units {
             })*
         }
         #[derive(Default, Debug, Clone)]
-        #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         pub struct UnitInputSignal {
             $(pub $unit_short_name: unit_in::$unit_name),*
         }
         #[derive(Default, Debug, Clone)]
-        #[cfg_attr(feature = "webapp", derive(serde::Serialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         pub struct UnitOutputSignal {
             $(pub $unit_short_name: unit_out::$unit_name),*
         }

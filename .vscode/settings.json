@@ -1,8 +1,8 @@
 {
     "rust-analyzer.cargo.features": [
-        "webapp"
+        "serde"
     ],
     "rust-analyzer.check.features": [
-        "webapp"
+        "serde"
     ]
 }

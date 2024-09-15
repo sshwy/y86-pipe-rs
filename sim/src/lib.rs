@@ -6,9 +6,6 @@ mod object;
 pub mod pipeline;
 mod utils;
 
-#[cfg(feature = "webapp")]
-mod webapp;
-
 pub use architectures::pipe_full::Arch;
 pub use asm::assemble;
 pub use asm::AssembleOption;

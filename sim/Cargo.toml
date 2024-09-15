@@ -23,12 +23,11 @@ pest_derive = "2.7"
 regex = "1.10"
 hcl_macro = { path = "../hcl_macro" }
 
-wasm-bindgen = { version = "0.2", optional = true }
-serde-wasm-bindgen = { version = "0.4", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 
 [features]
-webapp = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:serde"]
+serde = [ "dep:serde" ]
+
 
 [lib]
 crate-type = ["cdylib", "rlib"]
