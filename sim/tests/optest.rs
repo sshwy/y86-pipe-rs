@@ -8,10 +8,7 @@ use interpolator::{format, Formattable};
 const vals: [i64; 3] = [0x100, 0x020, 0x004];
 
 fn make_obj(src: &str) -> anyhow::Result<y86_sim::ObjectExt> {
-    let obj = y86_sim::assemble(
-        src,
-        y86_sim::AssembleOption::default().set_verbose(false),
-    )?;
+    let obj = y86_sim::assemble(src, y86_sim::AssembleOption::default().set_verbose(false))?;
 
     Ok(obj)
 }
@@ -47,12 +44,7 @@ fn test_reg_op() -> anyhow::Result<()> {
 
                 let src = format(source, args)?;
                 let obj = make_obj(&src)?;
-                let mut pipe = y86_sim::pipeline::Simulator::new(
-                    <y86_sim::Arch as y86_sim::pipeline::CpuArch>::Units::init(
-                        obj.obj.init_mem(),
-                    ),
-                    false,
-                );
+                let mut pipe = y86_sim::framework::Simulator::new(obj.obj.init_mem(), false);
                 while !pipe.is_terminate() {
                     pipe.step();
                 }

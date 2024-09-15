@@ -1,6 +1,20 @@
+//! To provide a flexible codebase for different CPU architectures, we give a
+//! general CPU simulator framework.
 mod propagate;
 
+pub trait HardwareUnits {
+    /// A set of hardware units should be initialized from a given memory.
+    fn init(memory: [u8; MEM_SIZE]) -> Self;
+    /// Get current memory data.
+    fn mem(&self) -> [u8; MEM_SIZE];
+}
+
 pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
+
+/// Size of the memory that is used to store instructions and data (stack).
+/// No matter what architecture we are using, memory store must exist. Otherwise
+/// we have no place to store instructions.
+pub const MEM_SIZE: usize = 1 << 20;
 
 pub enum CpuStatus {
     CycleStart,
@@ -37,7 +51,7 @@ pub trait CpuCircuit {
 }
 
 pub trait CpuArch: CpuCircuit {
-    type Units;
+    type Units: HardwareUnits;
 }
 
 pub type Signals<A> = (

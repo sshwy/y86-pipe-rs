@@ -5,7 +5,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::pipeline::CpuCircuit;
+use crate::framework::CpuCircuit;
 
 /// Vec<(is_unit, name)>.
 /// A node can be either a unit name or a intermediate signal name.

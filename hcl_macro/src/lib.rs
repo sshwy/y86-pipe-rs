@@ -172,8 +172,8 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            pub(crate) fn build_circuit() -> crate::pipeline::PropCircuit<Arch> {
-                use crate::pipeline::*;
+            pub(crate) fn build_circuit() -> crate::framework::PropCircuit<Arch> {
+                use crate::framework::*;
 
                 // cur: o, nex: i
                 let order = {
@@ -301,9 +301,12 @@ impl HclData {
     }
     fn render_update(&self) -> proc_macro2::TokenStream {
         quote! {
+            /// Simulate one cycle of the CPU, update the input and output signals
+            /// of each unit. Return the stage registers for the next cycle, along
+            /// with a tracer.
             #[allow(unused)]
             #[allow(non_snake_case)]
-            fn update(&mut self) -> (UnitOutputSignal, crate::pipeline::Tracer) {
+            fn update(&mut self) -> (UnitStageSignal, crate::framework::Tracer) {
                 let c = &mut self.cur_inter;
                 let i = &mut self.cur_unit_in;
                 let o = self.cur_unit_out.clone();
@@ -319,7 +322,21 @@ impl HclData {
                         rcd.run_combinatorial_logic(name);
                     }
                 }
-                rcd.finalize()
+                let (new_o, tracer) = rcd.finalize();
+
+                // status computed from previous cycle
+                // i. e. status during the current cycle
+                let cur_status = UnitStageSignal::from(&self.cur_unit_out);
+
+                // status computed from current cycle
+                // i. e. status during the next cycle
+                let next_status = UnitStageSignal::from(&new_o);
+
+                // only update output signals of functional units
+                self.cur_unit_out = new_o;
+                cur_status.update_output(&mut self.cur_unit_out);
+
+                (next_status, tracer)
             }
         }
     }
@@ -345,27 +362,30 @@ impl HclData {
             #[allow(unused)]
             pub struct Arch;
 
-            impl crate::pipeline::CpuCircuit for Arch {
+            impl crate::framework::CpuCircuit for Arch {
                 type UnitIn = UnitInputSignal;
                 type UnitOut = UnitOutputSignal;
                 type Inter = IntermediateSignal;
             }
 
-            impl crate::pipeline::CpuArch for Arch {
+            impl crate::framework::CpuArch for Arch {
                 type Units = Units;
             }
 
-            impl crate::pipeline::Simulator<Arch> {
+            impl crate::framework::Simulator<Arch> {
                 #build_circuit_fn
                 #update_fn
 
-                pub fn new(units: Units, tty_out: bool) -> Self {
+                /// Initialize the simulator with given memory
+                ///
+                /// tty_out: whether to print rich-text information
+                pub fn new(memory: [u8; crate::framework::MEM_SIZE], tty_out: bool) -> Self {
                     Self {
                         circuit: Self::build_circuit(),
                         cur_inter: IntermediateSignal::default(),
                         cur_unit_in: UnitInputSignal::default(),
                         cur_unit_out: UnitOutputSignal::default(),
-                        units,
+                        units: Units::init(memory),
                         terminate: None,
                         tty_out,
                     }

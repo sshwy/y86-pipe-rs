@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::framework::HardwareUnits;
 use crate::isa::cond_fn::*;
 use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
@@ -10,7 +11,7 @@ use crate::isa::reg_code;
 use crate::isa::reg_code::*;
 use crate::{
     define_units,
-    object::MEM_SIZE,
+    framework::MEM_SIZE,
     utils::{get_u64, put_u64},
 };
 
@@ -109,7 +110,10 @@ define_units! {
 
     PCIncrement pc_inc {
         .input(need_valc: bool, need_regids: bool, old_pc: u64)
-        .output(new_pc: u64)
+        .output(
+            /// The new PC value computed based on need_valc and need_regids.
+            new_pc: u64
+        )
     } {
         let mut x = old_pc + 1;
         if need_regids { x += 1; }
@@ -219,9 +223,9 @@ define_units! {
     }
 }
 
-impl Units {
+impl HardwareUnits for Units {
     /// Init CPU harewre with given memory.
-    pub fn init(memory: [u8; MEM_SIZE]) -> Self {
+    fn init(memory: [u8; MEM_SIZE]) -> Self {
         let cell = std::rc::Rc::new(RefCell::new(memory));
         Self {
             f: Fstage {},
@@ -245,9 +249,12 @@ impl Units {
             dmem: DataMemory { binary: cell },
         }
     }
-    pub(crate) fn mem(&self) -> [u8; MEM_SIZE] {
+    fn mem(&self) -> [u8; MEM_SIZE] {
         *self.dmem.binary.borrow()
     }
+}
+
+impl Units {
     pub(crate) fn print_reg(&self) -> String {
         use binutils::clap::builder::styling::*;
 

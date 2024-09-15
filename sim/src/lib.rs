@@ -1,9 +1,9 @@
 mod architectures;
 mod asm;
 mod dsl;
+pub mod framework;
 pub mod isa;
 mod object;
-pub mod pipeline;
 mod utils;
 
 pub use architectures::pipe_full::Arch;

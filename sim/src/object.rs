@@ -1,12 +1,10 @@
 //! This file provides binary representation of y86 instructions
 
-use crate::asm::{self, Reg};
+use crate::{
+    asm::{self, Reg},
+    framework::MEM_SIZE,
+};
 use std::{collections::BTreeMap, fmt::Display};
-
-/// Size of the memory that is used to store instructions and data (stack).
-/// No matter what architecture we are using, memory store must exist. Otherwise
-/// we have no place to store instructions.
-pub const MEM_SIZE: usize = 1 << 20;
 
 /// Maximum size of the assembled binary.
 const BIN_SIZE: usize = 1 << 16;

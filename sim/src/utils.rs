@@ -1,4 +1,4 @@
-use crate::object::MEM_SIZE;
+use crate::framework::MEM_SIZE;
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {

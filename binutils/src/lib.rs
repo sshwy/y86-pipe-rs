@@ -7,7 +7,7 @@ use clap::builder::styling::{AnsiColor, Color, Style};
 extern crate clap_verbosity_flag;
 
 pub mod verbose {
-    pub use clap_verbosity_flag::{Verbosity, Level};
+    pub use clap_verbosity_flag::{Level, Verbosity};
 }
 
 /// Cargo-like terminal color style.

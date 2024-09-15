@@ -13,8 +13,12 @@
 /// 4. After all signals reaching their destinations, the cycle ends. The inputs
 ///    of stage units will become the starting signals of the next cycle.
 ///
-/// **WARNING**: Do not use `.stage` with `.output` in the same unit. The
-/// behavior is undefined.
+/// **WARNING**:
+/// 1. Do not use `.stage` with `.output` in the same unit. The
+///    behavior is undefined.
+/// 2. The parameters in `.stage` must be `bubble` and `stall`. In this implementation,
+///    pipeline registers (flip-flop) are considered as a special unit that is trigger
+///    at the end of the cycle.
 #[macro_export]
 macro_rules! define_units {
     ($(
@@ -66,8 +70,8 @@ macro_rules! define_units {
             pub struct $unit_name {
                 $($(pub $pname: $ptype, )*)?
             }
-            impl From<super::unit_out::$unit_name> for $unit_name {
-                fn from(_value: super::unit_out::$unit_name) -> Self {
+            impl From<&super::unit_out::$unit_name> for $unit_name {
+                fn from(_value: &super::unit_out::$unit_name) -> Self {
                     Self { $($($pname: _value.$pname, )*)? }
                 }
             }
@@ -91,9 +95,9 @@ macro_rules! define_units {
         pub struct UnitStageSignal {
             $(pub $unit_short_name: unit_stage::$unit_name),*
         }
-        impl From<UnitOutputSignal> for UnitStageSignal {
-            fn from(value: UnitOutputSignal) -> Self {
-                Self { $( $unit_short_name: value.$unit_short_name.into(), )* }
+        impl From<&UnitOutputSignal> for UnitStageSignal {
+            fn from(value: &UnitOutputSignal) -> Self {
+                Self { $( $unit_short_name: (&value.$unit_short_name).into(), )* }
             }
         }
         impl UnitStageSignal {
@@ -173,7 +177,7 @@ macro_rules! define_units {
 
         /// This function add all devices nodes, input ports, output ports and stage signals
         /// to the graph builder.
-        pub fn hardware_setup(builder: &mut $crate::pipeline::PropOrderBuilder) {
+        pub fn hardware_setup(builder: &mut $crate::framework::PropOrderBuilder) {
             $(
             builder.add_unit_node(stringify!($unit_short_name));
             $( $( builder.add_unit_input(stringify!($unit_short_name), stringify!($iname)); )* )?
