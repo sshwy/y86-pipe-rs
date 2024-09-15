@@ -103,6 +103,7 @@ impl SourceInfo {
     }
 }
 
+/// A source info is one line of the .yo file.
 #[derive(Debug, Clone)]
 pub struct SourceInfo {
     pub(crate) addr: Option<u64>,

@@ -19,11 +19,13 @@ addr = { num? ~ "(" ~ reg ~ ")" }
 /// label symbol
 label = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 
+/// suffix used for cmov and j
 cc_suf = { "le" | "l" | "ge" | "g" | "e" | "ne" }
 rrmovq = { "rrmovq" }
 mp_suf = { "mp" }
 
-/// Instructions
+// Instructions
+
 i_single = { "ret" | "halt" | "nop" }
 i_cmovq  = { ( rrmovq | "cmov" ~ cc_suf) ~ whitespace* ~ reg ~ spaced_comma ~ reg }
 i_mrmovq = { "mrmovq" ~ whitespace* ~ addr ~ spaced_comma ~ reg }
@@ -36,9 +38,18 @@ i_call   = { "call" ~ whitespace* ~ label }
 i_pushq  = { "pushq" ~ whitespace* ~ reg }
 i_popq   = { "popq" ~ whitespace* ~ reg }
 
-/// Directives
+// Directives
+
 d_pos   = { ".pos" ~ whitespace* ~ num }
+
+/// - `.byte`: 1b
+/// - `.word`: 2b
+/// - `.long`: 4b
+/// - `.quad`: 8b
 d_data  = { (".byte" | ".word" | ".long" | ".quad") ~ whitespace* ~ (num | label) }
+
+/// Align the current instruction memory address to the multiple of the align number.
+/// The number should be pow of 2.
 d_align = { ".align" ~ whitespace* ~ num }
 
 /// can be placed at the end of a line

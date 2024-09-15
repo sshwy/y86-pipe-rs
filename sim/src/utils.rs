@@ -1,5 +1,16 @@
 use crate::isa::BIN_SIZE;
 
+/// Parse numeric literal from string in yas source efile
+pub fn parse_literal(s: &str) -> Option<u64> {
+    if let Some(r) = s.parse().ok() {
+        return Some(r);
+    }
+    if s.starts_with("0x") {
+        return u64::from_str_radix(&s[2..], 16).ok();
+    }
+    None
+}
+
 // little endian
 pub fn get_u64(binary: &[u8]) -> u64 {
     let mut res = 0;

@@ -49,7 +49,7 @@ fn main() -> Result<()> {
 
         mem_diff(&obj.obj.binary, &pipe.mem());
         // mem_print(&pipe.mem());
-        eprintln!("{}", obj);
+        // eprintln!("{}", obj);
     } else {
         let output_path = if let Some(path) = args.output {
             path

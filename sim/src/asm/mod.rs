@@ -7,18 +7,18 @@ use pest_derive::Parser;
 use crate::{
     isa::{self, reg_code},
     object::{Object, ObjectExt, SourceInfo},
+    utils,
 };
 
 #[derive(Parser)]
 #[grammar = "src/asm/grammer.pest"] // relative to src
 pub struct Y86AsmParser;
 
-pub fn parse(src: &str) -> Result<pest::iterators::Pairs<'_, Rule>> {
+pub fn parse(src: &str) -> Result<pest::iterators::Pair<'_, Rule>> {
     Ok(Y86AsmParser::parse(Rule::main, src)
         .context("fail to parse ys file")?
         .next()
-        .unwrap()
-        .into_inner())
+        .unwrap())
 }
 
 /// registers
@@ -138,22 +138,18 @@ impl From<u8> for OpFn {
 #[derive(Debug, Clone, Copy)]
 pub struct Addr(pub Option<u64>, pub Reg);
 
-impl From<pest::iterators::Pair<'_, Rule>> for Addr {
-    fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
-        let mut it = value.into_inner();
+impl From<ParseInput<'_>> for Addr {
+    fn from(value: ParseInput<'_>) -> Self {
+        let mut it = value.into_iter();
         let num_or_reg = it.next().unwrap();
         if num_or_reg.as_rule() == Rule::reg {
             // no displacement
-            let reg = Reg::from(num_or_reg);
+            let reg = Reg::from(num_or_reg.pair);
             Self(None, reg)
         } else {
             let s = num_or_reg.as_str();
-            let num = if let Ok(r) = s.parse() {
-                r
-            } else {
-                i64::from_str_radix(&s[2..], 16).unwrap()
-            };
-            let reg = Reg::from(it.next().unwrap());
+            let num = utils::parse_literal(s).unwrap() as i64;
+            let reg = it.next_reg();
             Self(Some(num as u64), reg)
         }
     }
@@ -166,18 +162,14 @@ pub enum Imm {
     Label(String),
 }
 
-impl From<pest::iterators::Pair<'_, Rule>> for Imm {
-    fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
+impl From<ParseInput<'_>> for Imm {
+    fn from(value: ParseInput<'_>) -> Self {
         if value.as_rule() == Rule::label {
             Self::Label(value.as_str().to_string())
         } else {
             let s = value.as_str();
             let s = s.strip_prefix('$').unwrap_or(s);
-            let num = if let Ok(r) = s.parse() {
-                r
-            } else {
-                i64::from_str_radix(&s[2..], 16).unwrap()
-            };
+            let num = utils::parse_literal(s).unwrap() as i64;
             Self::Num(num)
         }
     }
@@ -251,6 +243,59 @@ impl AssembleOption {
     }
 }
 
+#[derive(Debug, Clone)]
+struct ParseInput<'a> {
+    pair: pest::iterators::Pair<'a, Rule>,
+}
+
+impl<'a> IntoIterator for ParseInput<'a> {
+    type Item = ParseInput<'a>;
+    type IntoIter = ParseInputs<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ParseInputs {
+            pairs: self.pair.into_inner(),
+        }
+    }
+}
+
+impl<'a> ParseInput<'a> {}
+
+impl<'a> std::ops::Deref for ParseInput<'a> {
+    type Target = pest::iterators::Pair<'a, Rule>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.pair
+    }
+}
+
+struct ParseInputs<'a> {
+    pairs: pest::iterators::Pairs<'a, Rule>,
+}
+
+impl<'a> Iterator for ParseInputs<'a> {
+    type Item = ParseInput<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pairs.next().map(|pair| ParseInput { pair })
+    }
+}
+
+impl<'a> ParseInputs<'a> {
+    /// Parse next token as string
+    fn next_str(&mut self) -> &str {
+        self.next().unwrap().as_str()
+    }
+    /// Parse next token as register
+    fn next_reg(&mut self) -> Reg {
+        Reg::from(self.next().unwrap().pair)
+    }
+    /// Parse next token as address
+    fn next_addr(&mut self) -> Addr {
+        Addr::from(self.next().unwrap())
+    }
+}
+
 /// transform assembly code to binary object code
 pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
     macro_rules! verbo {
@@ -261,12 +306,14 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
         };
     }
     let mut src_infos = Vec::default();
-    let lines = parse(src).context("fail to assemble ys file")?;
+    let lines = ParseInput {
+        pair: parse(src).context("fail to assemble ys file")?,
+    };
     let mut cur_addr = u64::default();
 
     for line in lines {
-        let src = line.as_str().to_string();
-        let mut line = line.into_inner();
+        let src = line.pair.as_str().to_string();
+        let mut line = line.into_iter();
         let mut src_info = SourceInfo {
             addr: None,
             inst: None,
@@ -274,15 +321,16 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
             data: None,
             src,
         };
+        // if this line is not empty
         if let Some(pair) = line.next() {
             verbo!(&pair);
             src_info.addr = Some(cur_addr);
-            let pair2 = pair.clone();
-            let mut it = pair.into_inner();
-            match pair2.as_rule() {
-                Rule::label => src_info.label = Some(pair2.as_str().to_string()),
+            let tok2 = pair.clone();
+            let mut it = pair.into_iter();
+            match tok2.as_rule() {
+                Rule::label => src_info.label = Some(tok2.as_str().to_string()),
                 Rule::i_single => {
-                    src_info.inst = Some(match pair2.as_str() {
+                    src_info.inst = Some(match tok2.as_str() {
                         "halt" => Inst::HALT,
                         "nop" => Inst::NOP,
                         "ret" => Inst::RET,
@@ -291,45 +339,45 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     cur_addr += 1
                 }
                 Rule::i_cmovq => {
-                    let cond_fn = CondFn::from(it.next().unwrap().as_str());
-                    let reg_a = Reg::from(it.next().unwrap());
-                    let reg_b = Reg::from(it.next().unwrap());
+                    let cond_fn = CondFn::from(it.next_str());
+                    let reg_a = it.next_reg();
+                    let reg_b = it.next_reg();
                     src_info.inst = Some(Inst::CMOVX(cond_fn, reg_a, reg_b));
                     cur_addr += 2
                 }
                 Rule::i_mrmovq => {
-                    let addr = Addr::from(it.next().unwrap());
-                    let reg = Reg::from(it.next().unwrap());
+                    let addr = it.next_addr();
+                    let reg = it.next_reg();
                     src_info.inst = Some(Inst::MRMOVQ(addr, reg));
                     cur_addr += 10
                 }
                 Rule::i_rmmovq => {
-                    let reg = Reg::from(it.next().unwrap());
-                    let addr = Addr::from(it.next().unwrap());
+                    let reg = it.next_reg();
+                    let addr = it.next_addr();
                     src_info.inst = Some(Inst::RMMOVQ(reg, addr));
                     cur_addr += 10
                 }
                 Rule::i_irmovq => {
                     let imm = Imm::from(it.next().unwrap());
-                    let reg = Reg::from(it.next().unwrap());
+                    let reg = it.next_reg();
                     src_info.inst = Some(Inst::IRMOVQ(reg, imm));
                     cur_addr += 10
                 }
                 Rule::i_opq => {
-                    let reg_a = Reg::from(it.next().unwrap());
-                    let reg_b = Reg::from(it.next().unwrap());
-                    let op_fn = OpFn::from(pair2.as_str());
+                    let reg_a = it.next_reg();
+                    let reg_b = it.next_reg();
+                    let op_fn = OpFn::from(tok2.as_str());
                     src_info.inst = Some(Inst::OPQ(op_fn, reg_a, reg_b));
                     cur_addr += 2
                 }
                 Rule::i_iopq => {
                     let imm = Imm::from(it.next().unwrap());
-                    let reg = Reg::from(it.next().unwrap());
-                    let op_fn = OpFn::from(pair2.as_str());
+                    let reg = it.next_reg();
+                    let op_fn = OpFn::from(tok2.as_str());
                     src_info.inst = Some(Inst::IOPQ(op_fn, imm, reg));
                 }
                 Rule::i_jx => {
-                    let cond_fn = CondFn::from(it.next().unwrap().as_str());
+                    let cond_fn = CondFn::from(it.next_str());
                     let imm = Imm::from(it.next().unwrap());
                     src_info.inst = Some(Inst::JX(cond_fn, imm));
                     cur_addr += 9
@@ -340,29 +388,24 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     cur_addr += 9
                 }
                 Rule::i_pushq => {
-                    let reg = Reg::from(it.next().unwrap());
+                    let reg = it.next_reg();
                     src_info.inst = Some(Inst::PUSHQ(reg));
                     cur_addr += 2
                 }
                 Rule::i_popq => {
-                    let reg = Reg::from(it.next().unwrap());
+                    let reg = it.next_reg();
                     src_info.inst = Some(Inst::POPQ(reg));
                     cur_addr += 2
                 }
                 Rule::d_pos => {
-                    let s = it.next().unwrap().as_str();
-                    let num = if let Ok(r) = s.parse() {
-                        r
-                    } else {
-                        u64::from_str_radix(&s[2..], 16).unwrap()
-                    };
-
+                    let s = it.next_str();
+                    let num = utils::parse_literal(s).unwrap();
                     cur_addr = num;
                     src_info.addr = Some(cur_addr) // override
                 }
                 Rule::d_data => {
                     let imm = Imm::from(it.next().unwrap());
-                    if pair2.as_str().starts_with(".quad") {
+                    if tok2.as_str().starts_with(".quad") {
                         src_info.data = Some((8, imm));
                         cur_addr += 8;
                     } else {
@@ -370,14 +413,9 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     }
                 }
                 Rule::d_align => {
-                    let s = it.next().unwrap().as_str();
-                    let num = if let Ok(r) = s.parse() {
-                        r
-                    } else {
-                        i64::from_str_radix(&s[2..], 16).unwrap()
-                    };
-                    assert!(num & (-num) == num); // 2^k
-                    let num = num as u64;
+                    let s = it.next_str();
+                    let num = utils::parse_literal(s).unwrap();
+                    anyhow::ensure!(num.count_ones() == 1, "invalid align number");
                     if cur_addr % num > 0 {
                         cur_addr = cur_addr / num * num + num // ceil
                     }
