@@ -4,6 +4,12 @@ extern crate tracing_subscriber;
 // pub use clap;
 use clap::builder::styling::{AnsiColor, Color, Style};
 
+extern crate clap_verbosity_flag;
+
+pub mod verbose {
+    pub use clap_verbosity_flag::{Verbosity, Level};
+}
+
 /// Cargo-like terminal color style.
 ///
 /// # Example

@@ -1,10 +1,12 @@
 //! This file provides binary representation of y86 instructions
 
 use crate::asm::{self, Reg};
-use crate::isa::BIN_SIZE;
 use std::{collections::BTreeMap, fmt::Display};
 
-pub type SymbolMap = BTreeMap<String, u64>;
+/// Maximum size of output object binary data (64KB)
+pub const BIN_SIZE: usize = 1 << 16;
+
+type SymbolMap = BTreeMap<String, u64>;
 
 impl asm::Imm {
     fn desymbol(&self, sym: &SymbolMap) -> u64 {

@@ -1,7 +1,5 @@
 //! Instruction Set definition for Y86-64 Architecture
 
-pub const BIN_SIZE: usize = 1 << 16;
-
 macro_rules! define_code {
     {
         @mod $modname:ident;

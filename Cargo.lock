@@ -71,6 +71,7 @@ name = "binutils"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "clap-verbosity-flag",
  "tempfile",
  "tracing",
  "tracing-subscriber",
@@ -105,6 +106,16 @@ checksum = "3e5a21b8495e732f1b3c364c9949b201ca7bae518c502c80256c96ad79eaf6ac"
 dependencies = [
  "clap_builder",
  "clap_derive",
+]
+
+[[package]]
+name = "clap-verbosity-flag"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63d19864d6b68464c59f7162c9914a0b569ddc2926b4a2d71afe62a9738eff53"
+dependencies = [
+ "clap",
+ "log",
 ]
 
 [[package]]

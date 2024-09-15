@@ -14,7 +14,7 @@ pub use utils::{mem_diff, mem_print};
 
 #[cfg(test)]
 mod tests {
-    use crate::{assemble, isa::BIN_SIZE, AssembleOption};
+    use crate::{assemble, AssembleOption};
 
     #[test]
     fn test_assemble() {
@@ -23,14 +23,6 @@ mod tests {
         eprintln!("{}", r);
     }
 
-    #[test]
-    fn test_array() {
-        let a: [u8; 65536] = [0; BIN_SIZE];
-        let mut b = a;
-        let c = a;
-        b[0] = 12;
-        eprintln!("{:?}, {:?}", b[0], c[0]);
-    }
     /// in visualization of the architecture of pipeline, each tunnel
     /// starts from one ore more start points, may split to multiple heads,
     /// reaching various destination. What we concern is

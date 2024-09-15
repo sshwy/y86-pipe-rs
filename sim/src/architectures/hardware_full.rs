@@ -10,7 +10,7 @@ use crate::isa::reg_code;
 use crate::isa::reg_code::*;
 use crate::{
     define_units,
-    isa::BIN_SIZE,
+    object::BIN_SIZE,
     utils::{get_u64, put_u64},
 };
 
@@ -20,8 +20,8 @@ use crate::{
 pub enum Stat {
     /// Indicates that everything is fine.
     Aok = 0,
-    /// This is the initial state of each stage. During simulation we never assign
-    /// this value to any stage state.
+    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP instruction.
+    /// Initially, all stages are in the bubble state.
     Bub = 1,
     /// The halt state. This state is assigned when the instruction fetcher reads
     /// the halt instruction. (If your architecture lacks a instruction fetcher,
@@ -248,15 +248,31 @@ impl Units {
         *self.dmem.binary.borrow()
     }
     pub(crate) fn print_reg(&self) -> String {
-        format!("%rax {rax:#018x} %rbx {rbx:#018x} %rcx {rcx:#018x} %rdx {rdx:#018x}\n%rsi {rsi:#018x} %rdi {rdi:#018x} %rsp {rsp:#018x} %rbp {rbp:#018x}",
-            rax = self.reg_file.state[RAX as usize],
-            rbx = self.reg_file.state[RBX as usize],
-            rcx = self.reg_file.state[RCX as usize],
-            rdx = self.reg_file.state[RDX as usize],
-            rsi = self.reg_file.state[RSI as usize],
-            rdi = self.reg_file.state[RDI as usize],
-            rsp = self.reg_file.state[RSP as usize],
-            rbp = self.reg_file.state[RBP as usize],
+        use binutils::clap::builder::styling::*;
+
+        fn fmt_val(val: u64) -> String {
+            let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Black)));
+            if val == 0 {
+                format!("{s}{:016x}{s:#}", 0)
+            } else {
+                let num = format!("{val:x}");
+                let prefix = std::iter::repeat('0')
+                    .take(16 - num.len())
+                    .collect::<String>();
+                format!("{s}{}{s:#}{}", prefix, num)
+            }
+        }
+
+        format!(
+            "rax {rax} rbx {rbx} rcx {rcx} rdx {rdx}\nrsi {rsi} rdi {rdi} rsp {rsp} rbp {rbp}",
+            rax = fmt_val(self.reg_file.state[RAX as usize]),
+            rbx = fmt_val(self.reg_file.state[RBX as usize]),
+            rcx = fmt_val(self.reg_file.state[RCX as usize]),
+            rdx = fmt_val(self.reg_file.state[RDX as usize]),
+            rsi = fmt_val(self.reg_file.state[RSI as usize]),
+            rdi = fmt_val(self.reg_file.state[RDI as usize]),
+            rsp = fmt_val(self.reg_file.state[RSP as usize]),
+            rbp = fmt_val(self.reg_file.state[RBP as usize]),
         )
     }
 }
