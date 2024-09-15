@@ -56,14 +56,14 @@ pub enum Termination {
 /// pipeline simulator
 pub struct Simulator<T: CpuArch> {
     pub(crate) circuit: PropCircuit<T>,
-    /// signals are returned after each step, thus set to private
     pub(crate) cur_unit_in: T::UnitIn,
     pub(crate) cur_unit_out: T::UnitOut,
     pub(crate) cur_inter: T::Inter,
-    /// units are not easily made clone, thus it's up to app to decide which information to save.
     pub(crate) units: T::Units,
-    /// we have [`is_terminate`]
+    /// See [`Simulator::is_terminate`].
     pub(crate) terminate: Option<Termination>,
+    /// Whether to print the output to tty
+    pub(crate) tty_out: bool,
 }
 
 impl<T: CpuArch> Simulator<T> {

@@ -14,13 +14,14 @@ name = "yars"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0"
 pest = "2.7"
 pest_derive = "2.7"
 regex = "1.10"
 hcl_macro = { path = "../hcl_macro" }
 interpolator = "0.5.0"
 binutils = { path = "../binutils" }
+tracing.workspace = true
+anyhow.workspace = true
 
 serde = { version = "1.0", features = ["derive"], optional = true }
 

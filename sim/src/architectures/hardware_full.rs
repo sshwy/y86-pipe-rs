@@ -126,11 +126,11 @@ define_units! {
         *vala = if srca != RNONE { state[srca as usize] } else { 0 };
         *valb = if srcb != RNONE { state[srcb as usize] } else { 0 };
         if dste != RNONE {
-            eprintln!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
+            tracing::info!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
             state[dste as usize] = vale;
         }
         if dstm != RNONE {
-            eprintln!("write back fron m: dstm = {}, valm = {:#x}", reg_code::name_of(dstm), valm);
+            tracing::info!("write back fron m: dstm = {}, valm = {:#x}", reg_code::name_of(dstm), valm);
             state[dstm as usize] = valm;
         }
     }
@@ -172,7 +172,7 @@ define_units! {
         *sf = *s_sf;
         *of = *s_of;
         *zf = *s_zf;
-        eprintln!("a = {:#x}, b = {:#x}, e = {:#x}, sf = {sf}, of = {of}, zf = {zf}", a, b, e);
+        tracing::info!("a = {:#x}, b = {:#x}, e = {:#x}, sf = {sf}, of = {of}, zf = {zf}", a, b, e);
     }
 
     Condition cond {
@@ -209,7 +209,7 @@ define_units! {
         }
         *error = false;
         if write {
-            eprintln!("write memory: addr = {:#x}, datain = {:#x}", addr, datain);
+            tracing::info!("write memory: addr = {:#x}, datain = {:#x}", addr, datain);
             let section: &mut [u8] = &mut binary.borrow_mut()[(addr as usize)..];
             put_u64(section, datain);
             *dataout = 0;

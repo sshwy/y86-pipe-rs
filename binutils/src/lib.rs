@@ -12,7 +12,7 @@ use clap::builder::styling::{AnsiColor, Color, Style};
 /// # use clap::{Parser, command, arg};
 /// #[derive(Parser)]
 /// #[command(
-///     name = "zroj-server",
+///     name = "cli",
 ///     disable_version_flag = true,
 ///     styles = binutils::get_styles(),
 /// )]
@@ -71,6 +71,9 @@ pub fn logging_setup(
 
     let terminal_log = tracing_subscriber::fmt::layer()
         .compact()
+        .with_file(false)
+        .with_target(false)
+        .without_time()
         .with_thread_names(false)
         .with_filter(filter.clone());
 

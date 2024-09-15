@@ -740,4 +740,5 @@ dependencies = [
  "pest_derive",
  "regex",
  "serde",
+ "tracing",
 ]

@@ -51,6 +51,7 @@ fn test_reg_op() -> anyhow::Result<()> {
                     <y86_pipe_rs::Arch as y86_pipe_rs::pipeline::CpuArch>::Units::init(
                         obj.obj.binary,
                     ),
+                    false,
                 );
                 while !pipe.is_terminate() {
                     pipe.step();

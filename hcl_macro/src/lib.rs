@@ -217,27 +217,28 @@ impl HclData {
 
         let source_stmts = match &signal.source {
             items::SignalSource::Switch(SignalSwitch(cases)) => {
-                let case_stmts = cases.iter().map(|case| {
-                    let cond = case.condition.clone().map(mapper);
-                    let val = case.value.clone().map(mapper);
-                    let tunnel_stmts = case
-                        .tunnel.as_ref().cloned()
-                        .map(|tunnel| {
+                let case_stmts = cases
+                    .iter()
+                    .map(|case| {
+                        let cond = case.condition.clone().map(mapper);
+                        let val = case.value.clone().map(mapper);
+                        let tunnel_stmts = case.tunnel.as_ref().cloned().map(|tunnel| {
                             quote! {
                                 has_tunnel_input = true;
-                                let s = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                                eprintln!("{s}{}{s:#}", stringify!(#tunnel));
+                                tracing::debug!("tunnel triggered: {}", stringify!(#tunnel));
                                 tracer.trigger_tunnel(stringify!(#tunnel));
                             }
                         });
 
-                    quote! {
-                        if (u8::from(#cond)) != 0 {
-                            c.#name = #val;
-                            #tunnel_stmts
+                        quote! {
+                            if (u8::from(#cond)) != 0 {
+                                c.#name = #val;
+                                #tunnel_stmts
+                            }
                         }
-                    }
-                }).reduce(|a, b| quote! { #a else #b }).unwrap_or_default();
+                    })
+                    .reduce(|a, b| quote! { #a else #b })
+                    .unwrap_or_default();
 
                 quote! {
                     #case_stmts
@@ -248,8 +249,7 @@ impl HclData {
                 let tunnel_stmts = tunnel.as_ref().cloned().map(|tunnel| {
                     quote! {
                         has_tunnel_input = true;
-                        let s = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                        eprintln!("{s}{}{s:#}", stringify!(#tunnel));
+                        tracing::debug!("tunnel triggered: {}", stringify!(#tunnel));
                         tracer.trigger_tunnel(stringify!(#tunnel));
                     }
                 });
@@ -270,8 +270,7 @@ impl HclData {
                     quote! {
                         #dst = c.#name.to_owned();
                         if has_tunnel_input {
-                            let s = Style::new().bold().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-                            eprintln!("{s}{}{s:#}", stringify!(#tunnel));
+                            tracing::debug!("tunnel triggered: {}", stringify!(#tunnel));
                             tracer.trigger_tunnel(stringify!(#tunnel));
                         }
                     }
@@ -360,7 +359,7 @@ impl HclData {
                 #build_circuit_fn
                 #update_fn
 
-                pub fn new(units: Units) -> Self {
+                pub fn new(units: Units, tty_out: bool) -> Self {
                     Self {
                         circuit: Self::build_circuit(),
                         cur_inter: IntermediateSignal::default(),
@@ -368,6 +367,7 @@ impl HclData {
                         cur_unit_out: UnitOutputSignal::default(),
                         units,
                         terminate: None,
+                        tty_out,
                     }
                 }
             }

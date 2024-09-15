@@ -9,8 +9,8 @@ mod utils;
 pub use architectures::pipe_full::Arch;
 pub use asm::assemble;
 pub use asm::AssembleOption;
-pub use utils::{mem_diff, mem_print};
 pub use object::ObjectExt;
+pub use utils::{mem_diff, mem_print};
 
 #[cfg(test)]
 mod tests {

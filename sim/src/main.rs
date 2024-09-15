@@ -9,19 +9,30 @@ use y86_pipe_rs::{
 
 // Y86 assembler and pipeline simulator written in rust
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None, styles = binutils::get_styles())]
+#[command(
+    author,
+    version,
+    about,
+    long_about = None,
+    styles = binutils::get_styles(),
+    arg_required_else_help = true,
+)]
 struct Args {
-    /// input file path
+    /// Path to the input .ya file
     input: String,
 
-    /// output filename (default is input%.yo)
+    /// Output filename (default is input%.yo)
+    ///
+    /// Specify this option to write the assembled results to a file. This
+    /// option is conflict with `run`.
     #[arg(short = 'o', long)]
     output: Option<String>,
 
-    /// run the assembled binary in pipeline simulator
-    #[arg(short = 'r', long)]
+    /// Run the assembled binary in pipeline simulator
+    #[arg(long)]
     run: bool,
 
+    /// Print logs during simulation
     #[arg(short = 'v', long)]
     verbose: bool,
 }
@@ -35,16 +46,23 @@ fn main() -> Result<()> {
         AssembleOption::default().set_verbose(args.verbose),
     )?;
 
+    let log_level = if args.verbose {
+        &tracing::Level::DEBUG
+    } else {
+        &tracing::Level::INFO
+    };
+    binutils::logging_setup(log_level, None::<&std::fs::File>);
+
     if args.run {
         if args.output.is_some() {
             let mut cmd = Args::command();
             cmd.error(
                 ErrorKind::ArgumentConflict,
-                "Can't both specify output and run/tui",
+                "Can't both specify output and run",
             )
             .exit();
         }
-        let mut pipe = Simulator::new(<Arch as CpuArch>::Units::init(obj.obj.binary));
+        let mut pipe = Simulator::new(<Arch as CpuArch>::Units::init(obj.obj.binary), true);
 
         while !pipe.is_terminate() {
             let _out = pipe.step();
@@ -52,7 +70,6 @@ fn main() -> Result<()> {
 
         mem_diff(&obj.obj.binary, &pipe.mem());
         // mem_print(&pipe.mem());
-        // eprintln!("{}", obj);
     } else {
         let output_path = if let Some(path) = args.output {
             path

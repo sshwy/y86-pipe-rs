@@ -28,15 +28,15 @@ pub fn put_u64(binary: &mut [u8], val: u64) {
 pub fn mem_diff(left: &[u8; BIN_SIZE], right: &[u8; BIN_SIZE]) {
     for i in 0..BIN_SIZE >> 3 {
         if get_u64(&left[i << 3..]) != get_u64(&right[i << 3..]) {
-            eprint!("{:#06x}: ", i << 3,);
+            print!("{:#06x}: ", i << 3,);
             for byte in left[i << 3..].iter().take(8) {
-                eprint!("{:02x}", *byte)
+                print!("{:02x}", *byte)
             }
-            eprint!(" -> ");
+            print!(" -> ");
             for byte in right[i << 3..].iter().take(8) {
-                eprint!("{:02x}", *byte)
+                print!("{:02x}", *byte)
             }
-            eprintln!()
+            println!()
         }
     }
 }
@@ -49,10 +49,10 @@ pub fn mem_print(bin: &[u8; BIN_SIZE]) {
         }
     }
     for i in 0..=max_i {
-        eprint!("{:#06x}: ", i << 3);
+        print!("{:#06x}: ", i << 3);
         for byte in bin[i << 3..].iter().take(8) {
-            eprint!("{:02x}", *byte)
+            print!("{:02x}", *byte)
         }
-        eprintln!()
+        println!()
     }
 }
