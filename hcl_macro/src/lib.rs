@@ -371,6 +371,9 @@ impl HclData {
     }
 }
 
+/// This macro parse the Hardware Control Language (HCL) introduced in CS:APP3e.
+/// In general, it defines a set of signals, which connects outputs of units to inputs of units
+/// through Boolean expressions.
 #[proc_macro]
 pub fn hcl(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let data: HclData = syn::parse(item).unwrap();

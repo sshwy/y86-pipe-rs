@@ -20,9 +20,9 @@ macro_rules! define_units {
     ($(
         $(#[$att:meta])*
         $unit_name:ident $unit_short_name:ident {
-            $(.input( $($iname:ident : $itype:ty),* ))?
-            $(.output( $($oname:ident : $otype:ty),* ))?
-            $(.stage( $($pname:ident : $ptype:ty = $pdefault:expr),* ))?
+            $(.input( $($(#[$input_att:meta])* $iname:ident : $itype:ty),* ))?
+            $(.output( $($(#[$output_att:meta])* $oname:ident : $otype:ty),* ))?
+            $(.stage( $($(#[$stage_att:meta])* $pname:ident : $ptype:ty = $pdefault:expr),* ))?
             $($sname:ident : $stype:ty),* $(,)?
         } $($body:block)?
     )*) => {
@@ -33,8 +33,8 @@ macro_rules! define_units {
             $(#[derive(Default, Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
-                $($(pub $iname: $itype, )*)?
-                $($(pub $pname: $ptype, )*)?
+                $($($(#[$input_att])* pub $iname: $itype, )*)?
+                $($($(#[$stage_att])* pub $pname: $ptype, )*)?
             })*
         }
         /// Output signals of units
@@ -44,8 +44,8 @@ macro_rules! define_units {
             $(#[derive(Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
-                $($(pub $oname: $otype, )*)?
-                $($(pub $pname: $ptype, )*)?
+                $($($(#[$output_att])* pub $oname: $otype, )*)?
+                $($($(#[$stage_att])* pub $pname: $ptype, )*)?
             }
             impl Default for $unit_name {
                 fn default() -> Self {

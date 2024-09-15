@@ -8,12 +8,38 @@ use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
 use crate::isa::reg_code;
 use crate::isa::reg_code::*;
-use crate::pipeline::Stat;
 use crate::{
     define_units,
     isa::BIN_SIZE,
     utils::{get_u64, put_u64},
 };
+
+/// Simulator State (at each stage), depending on the hardware design.
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum Stat {
+    /// Indicates that everything is fine.
+    Aok = 0,
+    /// This is the initial state of each stage. During simulation we never assign
+    /// this value to any stage state.
+    Bub = 1,
+    /// The halt state. This state is assigned when the instruction fetcher reads
+    /// the halt instruction. (If your architecture lacks a instruction fetcher,
+    /// there should be some other way to specify the halt state in HCL.)
+    Hlt = 2,
+    /// This state is assigned when the instruction memory or data memory is accessed
+    /// with an invalid address.
+    Adr = 3,
+    /// This state is assigned when the instruction fetcher reads an invalid instruction
+    /// code.
+    Ins = 4,
+}
+
+impl Default for Stat {
+    fn default() -> Self {
+        Self::Aok
+    }
+}
 
 define_units! {
     // stage registers and default values for bubble status
@@ -167,7 +193,13 @@ define_units! {
 
     DataMemory dmem {
         .input(addr: u64, datain: u64, read: bool, write: bool)
-        .output(dataout: u64, error: bool)
+        .output(
+            /// If `read == true`, this signal is the data read from memory.
+            /// Otherwise this signal is set to 0.
+            dataout: u64,
+            /// Indicate if the address is invalid.
+            error: bool
+        )
         binary: Rc<RefCell<[u8; BIN_SIZE]>>
     } {
         if addr + 8 >= BIN_SIZE as u64 {

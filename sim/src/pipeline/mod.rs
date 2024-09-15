@@ -2,27 +2,6 @@ mod propagate;
 
 pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
 
-/// Simulator State
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub enum Stat {
-    Aok = 0,
-    /// bubble
-    Bub = 1,
-    /// halt
-    Hlt = 2,
-    /// invalid address
-    Adr = 3,
-    /// invalid instruction
-    Ins = 4,
-}
-
-impl Default for Stat {
-    fn default() -> Self {
-        Self::Aok
-    }
-}
-
 pub enum CpuStatus {
     CycleStart,
     CycleEnd,
