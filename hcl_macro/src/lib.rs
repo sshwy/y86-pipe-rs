@@ -352,7 +352,7 @@ impl HclData {
                 type Units = Units;
             }
 
-            impl crate::pipeline::Pipeline<Arch> {
+            impl crate::pipeline::Simulator<Arch> {
                 #build_circuit_fn
                 #update_fn
 

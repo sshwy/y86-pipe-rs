@@ -2,7 +2,7 @@ mod propagate;
 
 pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
 
-/// Pipeline State
+/// Simulator State
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Stat {
@@ -67,8 +67,8 @@ pub type Signals<A> = (
     <A as CpuCircuit>::Inter,
 );
 
-/// pipeline runner
-pub struct Pipeline<T: CpuArch> {
+/// pipeline simulator
+pub struct Simulator<T: CpuArch> {
     pub(crate) circuit: PropCircuit<T>,
     /// signals are returned after each step, thus set to private
     pub(crate) cur_unit_in: T::UnitIn,
@@ -80,7 +80,7 @@ pub struct Pipeline<T: CpuArch> {
     pub(crate) terminate: bool,
 }
 
-impl<T: CpuArch> Pipeline<T> {
+impl<T: CpuArch> Simulator<T> {
     pub fn is_terminate(&self) -> bool {
         self.terminate
     }

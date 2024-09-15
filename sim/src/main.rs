@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{error::ErrorKind, CommandFactory, Parser};
 use y86_pipe_rs::{
-    assemble, mem_diff, pipeline::CpuArch, Arch, AssembleOption, DefaultPipeline as Pipeline,
+    assemble, mem_diff, pipeline::CpuArch, Arch, AssembleOption, DefaultPipeline as Simulator,
 };
 
 // Y86 assembler and pipeline simulator written in rust
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
             )
             .exit();
         }
-        let mut pipe: Pipeline = Pipeline::new(<Arch as CpuArch>::Units::init(obj.obj.binary));
+        let mut pipe = Simulator::new(<Arch as CpuArch>::Units::init(obj.obj.binary));
 
         while !pipe.is_terminate() {
             let _out = pipe.step();
