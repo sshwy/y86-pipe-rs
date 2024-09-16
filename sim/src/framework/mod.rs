@@ -35,12 +35,6 @@ pub trait CpuSim {
     /// behavior is undefined.
     fn propagate_signals(&mut self);
 
-    /// Whether the simulation is terminated
-    fn is_terminate(&self) -> bool;
-
-    /// Whether the simulation is successfully halted
-    fn is_success(&self) -> bool;
-
     /// Get the current program counter
     fn program_counter(&self) -> u64;
 }
@@ -110,17 +104,14 @@ impl<T: CpuArch> PipeSim<T> {
         }
     }
 
-    // This function is called by hcl proc macro
-    #[doc(hidden)]
-    pub(crate) fn _is_terminate(&self) -> bool {
+    /// Whether the simulation is terminated
+    pub fn is_terminate(&self) -> bool {
         self.terminate.is_some()
     }
-    // This function is called by hcl proc macro
-    #[doc(hidden)]
-    pub(crate) fn _is_success(&self) -> bool {
+    /// Whether the simulation is successfully halted
+    pub fn is_success(&self) -> bool {
         matches!(self.terminate, Some(Termination::Halt))
     }
-
     pub fn mem(&self) -> [u8; MEM_SIZE] {
         self.units.mem()
     }

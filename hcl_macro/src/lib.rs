@@ -372,12 +372,6 @@ impl HclData {
                     self.update();
                     self.cycle_count += 1;
                 }
-                fn is_terminate(&self) -> bool {
-                    PipeSim::_is_terminate(&self)
-                }
-                fn is_success(&self) -> bool {
-                    PipeSim::_is_success(&self)
-                }
                 fn program_counter(&self) -> u64 {
                     self.cur_inter.#pc_name
                 }

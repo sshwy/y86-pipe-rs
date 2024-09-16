@@ -1,11 +1,7 @@
 use anyhow::{Context, Result};
 use binutils::{clap, verbose};
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use y86_sim::{
-    assemble,
-    framework::{CpuSim, PipeSim},
-    mem_diff, AssembleOption,
-};
+use y86_sim::{assemble, framework::PipeSim, mem_diff, AssembleOption};
 
 // Y86 assembler and pipeline simulator written in rust
 #[derive(Parser, Debug)]
