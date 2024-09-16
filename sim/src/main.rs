@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use binutils::{clap, verbose};
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use y86_sim::{assemble, framework::Simulator, mem_diff, AssembleOption};
+use y86_sim::{assemble, framework::{PipeSim, CpuSim}, mem_diff, AssembleOption};
 
 // Y86 assembler and pipeline simulator written in rust
 #[derive(Parser, Debug)]
@@ -64,7 +64,7 @@ fn main() -> Result<()> {
             )
             .exit();
         }
-        let mut pipe = Simulator::new(obj.obj.init_mem(), true);
+        let mut pipe = PipeSim::new(obj.obj.init_mem(), true);
 
         while !pipe.is_terminate() {
             let _out = pipe.step();

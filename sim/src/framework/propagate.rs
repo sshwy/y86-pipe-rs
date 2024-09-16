@@ -1,4 +1,3 @@
-use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     fmt::Debug,
@@ -18,15 +17,6 @@ pub type Updater<UnitIn, UnitOut, Inter> =
 #[derive(Debug, Default)]
 pub struct PropOrder {
     pub(crate) order: NameList,
-}
-
-fn replace_abbr(abbrs: &[(&'static str, &'static str)], str: &str) -> String {
-    let mut r = str.to_string();
-    for (origin, abbr) in abbrs {
-        let re = Regex::new(&format!(r"\b{abbr}\b")).unwrap();
-        r = re.replace_all(&r, *origin).to_string();
-    }
-    r
 }
 
 /// Compute topological order of nodes using BFS.
@@ -80,8 +70,6 @@ pub struct PropOrderBuilder {
     /// (name, body)
     deps: Vec<(String, String)>,
     rev_deps: Vec<(String, String)>,
-    // abbrs for pass output
-    abbrs: Vec<(&'static str, &'static str)>,
     output_prefix: &'static str,
     input_prefix: &'static str,
 }
@@ -96,13 +84,9 @@ impl PropOrderBuilder {
             rev_deps: Default::default(),
             edges: Default::default(),
             stage_units: Default::default(),
-            abbrs: Default::default(),
             output_prefix,
             input_prefix,
         }
-    }
-    pub fn add_stage_output(&mut self, origin: &'static str, abbr: &'static str) {
-        self.abbrs.push((origin, abbr));
     }
     fn add_edge(&mut self, from: String, to: String) {
         self.nodes.insert(from.clone());
@@ -149,7 +133,6 @@ impl PropOrderBuilder {
         // (from, to)
         let mut new_edges = Vec::new();
         for (name, body) in &self.deps {
-            let body = replace_abbr(&self.abbrs, body);
             for node in &self.nodes {
                 // edges from device to there inputs/outputs has already bean added
                 // thus is filtered out
@@ -159,7 +142,6 @@ impl PropOrderBuilder {
             }
         }
         for (name, body) in &self.rev_deps {
-            let body = replace_abbr(&self.abbrs, body);
             for node in &self.nodes {
                 // edges from device to there inputs/outputs has already bean added
                 // thus is filtered out

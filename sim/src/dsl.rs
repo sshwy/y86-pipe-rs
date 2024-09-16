@@ -91,16 +91,17 @@ macro_rules! define_units {
         pub struct UnitOutputSignal {
             $(pub $unit_short_name: unit_out::$unit_name),*
         }
+        /// All pipeline registers (all stages).
         #[derive(Debug, Clone)]
-        pub struct UnitStageSignal {
+        pub struct PipeRegs {
             $(pub $unit_short_name: unit_stage::$unit_name),*
         }
-        impl From<&UnitOutputSignal> for UnitStageSignal {
+        impl From<&UnitOutputSignal> for PipeRegs {
             fn from(value: &UnitOutputSignal) -> Self {
                 Self { $( $unit_short_name: (&value.$unit_short_name).into(), )* }
             }
         }
-        impl UnitStageSignal {
+        impl PipeRegs {
             pub fn update_output(self, value: &mut UnitOutputSignal) {
                 $(self.$unit_short_name.update_output(&mut value.$unit_short_name); )*
             }

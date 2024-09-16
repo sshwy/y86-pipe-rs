@@ -116,15 +116,28 @@ impl HclData {
         }
     }
     fn render_build_circuit(&self) -> proc_macro2::TokenStream {
-        let stage_stmts = self
-            .stage_alias
-            .0
+        let inter = &quote::format_ident!("c");
+        let inter_names = self
+            .intermediate_signals
             .iter()
-            .map(|(cur, pre)| {
-                quote! {
-                    g.add_stage_output(concat!("o.", stringify!(#cur)), stringify!(#pre));
-                }
-            })
+            .map(|s| &s.name)
+            .collect::<Vec<_>>();
+        let stage_alias = &self.stage_alias.0;
+
+        let mapper = |mut lv: LValue| -> LValue {
+            if inter_names.contains(&&lv.0[0]) {
+                lv.0.insert(0, inter.clone().into());
+            } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
+                lv.0[0] = cur.clone();
+                lv.0.insert(0, format_ident!("o"));
+            }
+            lv
+        };
+
+        let updaters_stmt = self
+            .intermediate_signals
+            .iter()
+            .map(|s| HclData::render_signal_updater(s, mapper))
             .reduce(|a, b| quote! { #a #b })
             .unwrap_or_default();
 
@@ -133,7 +146,12 @@ impl HclData {
             .iter()
             .map(|signal| {
                 let name = &signal.name;
-                let update_deps = signal.source.lvalues();
+                let update_deps = signal
+                    .source
+                    .lvalues()
+                    .into_iter()
+                    .map(mapper.clone())
+                    .collect::<Punctuated<LValue, Token![,]>>();
 
                 let update_stmts = quote! {
                     g.add_update(stringify!(#name), stringify!(#update_deps));
@@ -158,19 +176,6 @@ impl HclData {
             .reduce(|a, b| quote! { #a #b })
             .unwrap_or_default();
 
-        let inter = &quote::format_ident!("c");
-        let inter_names = self
-            .intermediate_signals
-            .iter()
-            .map(|s| &s.name)
-            .collect::<Vec<_>>();
-        let updaters_stmt = self
-            .intermediate_signals
-            .iter()
-            .map(|s| HclData::render_signal_updater(s, inter, &inter_names, &self.stage_alias))
-            .reduce(|a, b| quote! { #a #b })
-            .unwrap_or_default();
-
         quote! {
             pub(crate) fn build_circuit() -> crate::framework::PropCircuit<Arch> {
                 use crate::framework::*;
@@ -178,7 +183,6 @@ impl HclData {
                 // cur: o, nex: i
                 let order = {
                     let mut g = PropOrderBuilder::new("o", "i");
-                    #stage_stmts
                     // hardware setup
                     hardware_setup(&mut g);
                     #stmts
@@ -198,30 +202,17 @@ impl HclData {
     }
     fn render_signal_updater(
         signal: &SignalDef,
-        inter: &syn::Ident,
-        inter_names: &[&syn::Ident],
-        stage_alias: &StageAlias,
+        mapper: impl Fn(LValue) -> LValue + Clone,
     ) -> proc_macro2::TokenStream {
         let name = &signal.name;
-        let stage_alias = &stage_alias.0;
-
-        let mapper = |mut lv: LValue| -> LValue {
-            if inter_names.contains(&&lv.0[0]) {
-                lv.0.insert(0, inter.clone().into());
-            } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
-                lv.0[0] = cur.clone();
-                lv.0.insert(0, format_ident!("o"));
-            }
-            lv
-        };
 
         let source_stmts = match &signal.source {
             items::SignalSource::Switch(SignalSwitch(cases)) => {
                 let case_stmts = cases
                     .iter()
                     .map(|case| {
-                        let cond = case.condition.clone().map(mapper);
-                        let val = case.value.clone().map(mapper);
+                        let cond = case.condition.clone().map(mapper.clone());
+                        let val = case.value.clone().map(mapper.clone());
                         let tunnel_stmts = case.tunnel.as_ref().cloned().map(|tunnel| {
                             quote! {
                                 has_tunnel_input = true;
@@ -306,7 +297,7 @@ impl HclData {
             /// with a tracer.
             #[allow(unused)]
             #[allow(non_snake_case)]
-            fn update(&mut self) -> (UnitStageSignal, crate::framework::Tracer) {
+            fn update(&mut self) -> (PipeRegs, crate::framework::Tracer) {
                 let c = &mut self.cur_inter;
                 let i = &mut self.cur_unit_in;
                 let o = self.cur_unit_out.clone();
@@ -326,11 +317,11 @@ impl HclData {
 
                 // status computed from previous cycle
                 // i. e. status during the current cycle
-                let cur_status = UnitStageSignal::from(&self.cur_unit_out);
+                let cur_status = PipeRegs::from(&self.cur_unit_out);
 
                 // status computed from current cycle
                 // i. e. status during the next cycle
-                let next_status = UnitStageSignal::from(&new_o);
+                let next_status = PipeRegs::from(&new_o);
 
                 // only update output signals of functional units
                 self.cur_unit_out = new_o;
@@ -372,7 +363,7 @@ impl HclData {
                 type Units = Units;
             }
 
-            impl crate::framework::Simulator<Arch> {
+            impl crate::framework::PipeSim<Arch> {
                 #build_circuit_fn
                 #update_fn
 

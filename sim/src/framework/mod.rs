@@ -25,13 +25,7 @@ pub enum CpuStatus {
 /// the combinational logic circuits. The signals are then latched into the pipeline
 /// registers at the end of the cycle. Therefore we can use two basic operations to
 /// simulate the pipeline.
-trait CpuSim {
-    type UnitInputSignals;
-    type UnitOutputSignals;
-    /// In the pipeline, we have specific memory devices to store data.
-    /// Stage data are signals that passed between CPU cycles.
-    type StageData;
-
+pub trait CpuSim {
     /// Initiate the next cycle or the first cycle. This function should be called
     /// at the very beginning of the simulation, or after calling [`CpuSim::propagate_signals`].
     /// Otherwise the behavior is undefined.
@@ -41,6 +35,12 @@ trait CpuSim {
     /// should be called after [`CpuSim::initiate_next_cycle`]. Otherwise the
     /// behavior is undefined.
     fn propagate_signals(&mut self);
+
+    /// Whether the simulation is terminated
+    fn is_terminate(&self) -> bool;
+
+    /// Whether the simulation is successfully halted
+    fn is_success(&self) -> bool;
 }
 
 // here we use trait to collect the types
@@ -67,25 +67,29 @@ pub enum Termination {
     Error,
 }
 
-/// pipeline simulator
-pub struct Simulator<T: CpuArch> {
+/// Pipeline simulator. A general CPU pipeline involves several pipeline registers
+/// (flip-flops) and combinational logic circuits.
+pub struct PipeSim<T: CpuArch> {
     pub(crate) circuit: PropCircuit<T>,
     pub(crate) cur_unit_in: T::UnitIn,
     pub(crate) cur_unit_out: T::UnitOut,
     pub(crate) cur_inter: T::Inter,
     pub(crate) units: T::Units,
-    /// See [`Simulator::is_terminate`].
+    /// See [`PipeSim::is_terminate`].
     pub(crate) terminate: Option<Termination>,
     /// Whether to print the output to tty
     pub(crate) tty_out: bool,
 }
 
-impl<T: CpuArch> Simulator<T> {
-    pub fn is_terminate(&self) -> bool {
+impl<T: CpuArch> PipeSim<T> {
+    // This function is called by hcl proc macro
+    #[doc(hidden)]
+    pub(crate) fn _is_terminate(&self) -> bool {
         self.terminate.is_some()
     }
-    /// Whether the simulation is successfully halted
-    pub fn is_success(&self) -> bool {
+    // This function is called by hcl proc macro
+    #[doc(hidden)]
+    pub(crate) fn _is_success(&self) -> bool {
         matches!(self.terminate, Some(Termination::Halt))
     }
 }

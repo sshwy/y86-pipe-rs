@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use interpolator::{format, Formattable};
+use y86_sim::framework::{PipeSim, CpuSim};
 
 #[allow(non_upper_case_globals)]
 const vals: [i64; 3] = [0x100, 0x020, 0x004];
@@ -44,7 +45,7 @@ fn test_reg_op() -> anyhow::Result<()> {
 
                 let src = format(source, args)?;
                 let obj = make_obj(&src)?;
-                let mut pipe = y86_sim::framework::Simulator::new(obj.obj.init_mem(), false);
+                let mut pipe = PipeSim::new(obj.obj.init_mem(), false);
                 while !pipe.is_terminate() {
                     pipe.step();
                 }
