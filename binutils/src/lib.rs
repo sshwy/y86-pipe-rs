@@ -1,10 +1,6 @@
 /// re-export clap
-pub extern crate clap;
-extern crate tracing_subscriber;
-// pub use clap;
+pub use clap;
 use clap::builder::styling::{AnsiColor, Color, Style};
-
-extern crate clap_verbosity_flag;
 
 pub mod verbose {
     pub use clap_verbosity_flag::{Level, Verbosity};
@@ -81,6 +77,7 @@ pub fn logging_setup(
         .with_target(false)
         .without_time()
         .with_thread_names(false)
+        .with_writer(std::io::stderr)
         .with_filter(filter.clone());
 
     let file_log = log_file.map(|file| {
