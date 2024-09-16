@@ -21,15 +21,20 @@
 ///    at the end of the cycle.
 #[macro_export]
 macro_rules! define_units {
-    ($(
+    (PipeRegs { $(
+        $(#[$stage_att:meta])*
+        $pr_name:ident $pr_short_name:ident {
+            $($(#[$pr_att:meta])* $pname:ident : $ptype:ty = $pdefault:expr),*
+        }
+    )* }
+    FunctionalUnits { $(
         $(#[$att:meta])*
         $unit_name:ident $unit_short_name:ident {
             $(.input( $($(#[$input_att:meta])* $iname:ident : $itype:ty),* ))?
             $(.output( $($(#[$output_att:meta])* $oname:ident : $otype:ty),* ))?
-            $(.stage( $($(#[$stage_att:meta])* $pname:ident : $ptype:ty = $pdefault:expr),* ))?
             $($sname:ident : $stype:ty),* $(,)?
         } $($body:block)?
-    )*) => {
+    )* }) => {
         /// Input signals of units
         pub mod unit_in {
             #![allow(unused_imports)]
@@ -38,27 +43,16 @@ macro_rules! define_units {
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
                 $($($(#[$input_att])* pub $iname: $itype, )*)?
-                $($($(#[$stage_att])* pub $pname: $ptype, )*)?
             })*
         }
         /// Output signals of units
         pub mod unit_out {
             #![allow(unused_imports)]
             use super::*;
-            $(#[derive(Debug, Clone)]
+            $(#[derive(Default, Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $unit_name {
                 $($($(#[$output_att])* pub $oname: $otype, )*)?
-                $($($(#[$stage_att])* pub $pname: $ptype, )*)?
-            }
-            impl Default for $unit_name {
-                fn default() -> Self {
-                    Self {
-                        $($($oname: Default::default(), )*)?
-                        // default values for stage units are assigned for the first cycle
-                        $($($pname: $pdefault, )*)?
-                    }
-                }
             })*
         }
         /// Signals stored in stage units
@@ -67,20 +61,58 @@ macro_rules! define_units {
             use super::*;
             $(#[derive(Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-            pub struct $unit_name {
-                $($(pub $pname: $ptype, )*)?
+            pub struct $pr_name {
+                $(pub $pname: $ptype, )*
+                pub bubble: bool,
+                pub stall: bool,
             }
-            impl From<&super::unit_out::$unit_name> for $unit_name {
-                fn from(_value: &super::unit_out::$unit_name) -> Self {
-                    Self { $($($pname: _value.$pname, )*)? }
+            impl Default for $pr_name {
+                fn default() -> Self {
+                    Self {
+                        $( $pname: $pdefault, )*
+                        bubble: false,
+                        stall: false,
+                    }
                 }
             }
-            impl $unit_name {
-                pub fn update_output(self, _value: &mut super::unit_out::$unit_name) {
-                    $($(_value.$pname = self.$pname; )*)?
+            impl $pr_name {
+                /// Select states based on `new.bubble` and `new.stall`.
+                ///
+                /// The result is stored in `self`.
+                #[allow(unused)]
+                pub fn mux(&mut self, new: &Self) {
+                    // this block is executed at the end of the cycle
+                    if new.bubble {
+                        $( self.$pname = $pdefault; )*
+                        if new.stall {
+                            panic!("bubble and stall at the same time")
+                        }
+                    } else if !new.stall {
+                        // if not stalled, we update the output signals
+                        // by its input signals computed in this cycle
+                        $( self.$pname = new.$pname; )*
+                    }
+                    // (stall) otherwise we keep the old state
+                    // the same as the previous cycle
                 }
             })*
         }
+
+        /// All pipeline registers (all stages).
+        #[derive(Default, Debug, Clone)]
+        pub struct PipeRegs {
+            $(pub $pr_short_name: unit_stage::$pr_name),*
+        }
+
+        impl PipeRegs {
+            /// Trigger all pipeline registers at the end of the cycle.
+            #[allow(unused)]
+            pub fn mux(&mut self, new: &PipeRegs) {
+                $( self.$pr_short_name.mux(&new.$pr_short_name); )*
+            }
+        }
+
+
         #[derive(Default, Debug, Clone)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         pub struct UnitInputSignal {
@@ -91,28 +123,12 @@ macro_rules! define_units {
         pub struct UnitOutputSignal {
             $(pub $unit_short_name: unit_out::$unit_name),*
         }
-        /// All pipeline registers (all stages).
-        #[derive(Debug, Clone)]
-        pub struct PipeRegs {
-            $(pub $unit_short_name: unit_stage::$unit_name),*
-        }
-        impl From<&UnitOutputSignal> for PipeRegs {
-            fn from(value: &UnitOutputSignal) -> Self {
-                Self { $( $unit_short_name: (&value.$unit_short_name).into(), )* }
-            }
-        }
-        impl PipeRegs {
-            pub fn update_output(self, value: &mut UnitOutputSignal) {
-                $(self.$unit_short_name.update_output(&mut value.$unit_short_name); )*
-            }
-        }
-
         /// A unit simulates a circuit in the CPU. It receives signals from
         /// the previous stage and outputs signals to the next stage.
         ///
         /// Units include stages and combinational logics.
         pub trait Unit {
-            fn run(&mut self, signals: (UnitInputSignal, &mut UnitOutputSignal));
+            fn run(&mut self, signals: (&UnitInputSignal, &mut UnitOutputSignal));
         }
 
         $( #[allow(unused)]
@@ -124,41 +140,20 @@ macro_rules! define_units {
         $( impl $unit_name {
             #[allow(unused)]
             pub fn trigger(Self{ $( $sname ),* }: &mut Self,
-                inputs: unit_in::$unit_name,
+                inputs: &unit_in::$unit_name,
                 outputs: &mut unit_out::$unit_name,
             ) {
-                let unit_in::$unit_name{$($( $iname, )*)? .. } = inputs;
+                let unit_in::$unit_name{$($( $iname, )*)? .. } = inputs.clone();
                 let unit_out::$unit_name{$($( $oname, )*)? .. } = outputs;
-
-                // this block is executed at the end of the cycle
-                // todo: implement this logic in hardware
-                $(
-                    if inputs.bubble {
-                        $( outputs.$pname = $pdefault; )*
-                        if inputs.stall {
-                            panic!("bubble and stall at the same time")
-                        }
-                    } else if !inputs.stall {
-                        // if not stalled, we update the output signals
-                        // by its input signals computed in this cycle
-                        $( outputs.$pname = inputs.$pname; )*
-                    } else { // stall
-                        // otherwise we keep the output signals
-                        // the same as the previous cycle
-                    }
-                )?
-
-                // for functional units, we execute its logic here
                 $($body)?
             }
         }
         impl Unit for $unit_name {
             #[allow(unused)]
-            fn run(&mut self, (input, output): (UnitInputSignal, &mut UnitOutputSignal)) {
-                $unit_name::trigger(self, input.$unit_short_name, &mut output.$unit_short_name)
+            fn run(&mut self, (input, output): (&UnitInputSignal, &mut UnitOutputSignal)) {
+                $unit_name::trigger(self, &input.$unit_short_name, &mut output.$unit_short_name)
             }
-        }
-        )*
+        })*
 
         pub struct Units {
             $( $unit_short_name: $unit_name, )*
@@ -166,7 +161,7 @@ macro_rules! define_units {
         impl Units {
             /// Execute this unit by processing the input signals and updating its output signals.
             #[allow(unused)]
-            pub fn run(&mut self, name: &'static str, sigs: (UnitInputSignal, &mut UnitOutputSignal)) {
+            pub fn run(&mut self, name: &'static str, sigs: (&UnitInputSignal, &mut UnitOutputSignal)) {
                 match name {
                     $( stringify!($unit_short_name) =>
                         self.$unit_short_name.run(sigs),
@@ -183,7 +178,7 @@ macro_rules! define_units {
             builder.add_unit_node(stringify!($unit_short_name));
             $( $( builder.add_unit_input(stringify!($unit_short_name), stringify!($iname)); )* )?
             $( $( builder.add_unit_output(stringify!($unit_short_name), stringify!($oname)); )* )?
-            $( $( builder.add_unit_stage(stringify!($unit_short_name), stringify!($pname)); )* )?
+            // $( $( builder.add_unit_stage(stringify!($unit_short_name), stringify!($pname)); )* )?
             )*
         }
     };

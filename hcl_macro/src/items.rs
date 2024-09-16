@@ -2,6 +2,34 @@ use crate::expr;
 use expr::LValue;
 use syn::{parse::Parse, punctuated::Punctuated, Token};
 
+struct AtoB {
+    a: syn::Ident,
+    b: syn::Ident,
+}
+
+impl Parse for AtoB {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let a = input.parse()?;
+        input.parse::<Token![=>]>()?;
+        let b = input.parse()?;
+        Ok(Self { a, b })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct StageAlias(pub Vec<(syn::Ident, syn::Ident)>);
+
+impl Parse for StageAlias {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let args = Punctuated::<AtoB, Token![,]>::parse_terminated(input)?;
+        Ok(Self(
+            args.iter()
+                .map(|arg| (arg.b.clone(), arg.a.clone()))
+                .collect(),
+        ))
+    }
+}
+
 /// e.g. `imem.error => NOP`
 #[derive(Debug)]
 pub struct Case {

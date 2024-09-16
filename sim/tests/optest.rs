@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use interpolator::{format, Formattable};
-use y86_sim::framework::{PipeSim, CpuSim};
+use y86_sim::framework::{CpuSim, PipeSim};
 
 #[allow(non_upper_case_globals)]
 const vals: [i64; 3] = [0x100, 0x020, 0x004];

@@ -5,29 +5,10 @@ use syn::{parse::Parse, parse_quote, punctuated::Punctuated, Token};
 mod expr;
 mod items;
 
-#[derive(Debug, Default)]
-struct StageAlias(Vec<(syn::Ident, syn::Ident)>);
-
-impl Parse for StageAlias {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let args = Punctuated::<syn::MetaNameValue, Token![,]>::parse_terminated(input)?;
-        Ok(Self(
-            args.iter()
-                .map(|arg| {
-                    let ident = arg.path.get_ident().unwrap();
-                    let value = &arg.value;
-                    let value: syn::Ident = parse_quote! { #value };
-                    (ident.clone(), value)
-                })
-                .collect(),
-        ))
-    }
-}
-
 struct HclData {
     hardware: syn::ExprPath,
     /// (cur, pre)
-    stage_alias: StageAlias,
+    pub stage_alias: items::StageAlias,
     use_items: Vec<syn::ItemUse>,
     intermediate_signals: Vec<items::SignalDef>,
 }
@@ -59,7 +40,7 @@ impl Parse for HclData {
             .iter()
             .find_map(|attr| {
                 if attr.path().is_ident("stage_alias") {
-                    let stage_alias = attr.parse_args::<StageAlias>().unwrap();
+                    let stage_alias = attr.parse_args::<items::StageAlias>().unwrap();
 
                     Some(stage_alias)
                 } else {
@@ -116,7 +97,7 @@ impl HclData {
         }
     }
     fn render_build_circuit(&self) -> proc_macro2::TokenStream {
-        let inter = &quote::format_ident!("c");
+        let inter = &quote::format_ident!("c_");
         let inter_names = self
             .intermediate_signals
             .iter()
@@ -129,7 +110,10 @@ impl HclData {
                 lv.0.insert(0, inter.clone().into());
             } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
                 lv.0[0] = cur.clone();
-                lv.0.insert(0, format_ident!("o"));
+                lv.0.insert(0, format_ident!("p_"));
+            } else if let Some((cur, _)) = stage_alias.iter().find(|(cur, _)| &lv.0[0] == cur) {
+                lv.0[0] = cur.clone();
+                lv.0.insert(0, format_ident!("n_"));
             }
             lv
         };
@@ -223,7 +207,7 @@ impl HclData {
 
                         quote! {
                             if (u8::from(#cond)) != 0 {
-                                c.#name = #val;
+                                c_.#name = #val;
                                 #tunnel_stmts
                             }
                         }
@@ -236,7 +220,7 @@ impl HclData {
                 }
             }
             items::SignalSource::Expr(SignalSourceExpr { tunnel, expr }) => {
-                let expr = expr.clone().map(mapper);
+                let expr = expr.clone().map(mapper.clone());
                 let tunnel_stmts = tunnel.as_ref().cloned().map(|tunnel| {
                     quote! {
                         has_tunnel_input = true;
@@ -246,7 +230,7 @@ impl HclData {
                 });
 
                 quote! {
-                    c.#name = #expr;
+                    c_.#name = #expr;
                     #tunnel_stmts
                 }
             }
@@ -256,10 +240,10 @@ impl HclData {
             .destinations
             .iter()
             .map(|dest| {
-                let dst = &dest.dest;
+                let dst = dest.dest.clone().map(mapper.clone());
                 if let Some(tunnel) = dest.tunnel.as_ref() {
                     quote! {
-                        #dst = c.#name.to_owned();
+                        #dst = c_.#name.to_owned();
                         if has_tunnel_input {
                             tracing::debug!("tunnel triggered: {}", stringify!(#tunnel));
                             tracer.trigger_tunnel(stringify!(#tunnel));
@@ -267,7 +251,7 @@ impl HclData {
                     }
                 } else {
                     quote! {
-                        #dst = c.#name.to_owned();
+                        #dst = c_.#name.to_owned();
                     }
                 }
             })
@@ -278,9 +262,11 @@ impl HclData {
             {
                 fn updater(
                     i: &mut UnitInputSignal,
-                    c: &mut IntermediateSignal,
+                    c_: &mut IntermediateSignal,
+                    n_: &mut PipeRegs,
                     tracer: &mut Tracer,
-                    o: UnitOutputSignal,
+                    o: &UnitOutputSignal,
+                    p_: &PipeRegs,
                 ) {
                     let mut has_tunnel_input = false;
                     #source_stmts
@@ -297,37 +283,27 @@ impl HclData {
             /// with a tracer.
             #[allow(unused)]
             #[allow(non_snake_case)]
-            fn update(&mut self) -> (PipeRegs, crate::framework::Tracer) {
-                let c = &mut self.cur_inter;
-                let i = &mut self.cur_unit_in;
-                let o = self.cur_unit_out.clone();
-
-                let mut rcd = self.circuit.updates.make_propagator(i, o, c);
+            fn update(&mut self) -> crate::framework::Tracer {
+                let mut rcd = self.circuit.updates.make_propagator(
+                    &mut self.cur_unit_in,
+                    self.cur_unit_out.clone(),
+                    &mut self.nex_state,
+                    &self.cur_state,
+                    &mut self.cur_inter
+                );
                 let units = &mut self.units;
                 for (is_unit, name) in &self.circuit.order.order {
                     if *is_unit {
-                        let (mut unit_in, mut unit_out) = rcd.signals();
-                        units.run(name, (unit_in, &mut unit_out));
-                        rcd.update_from_unit_out(unit_out)
+                        rcd.run_unit(|unit_in, unit_out| {
+                            units.run(name, (unit_in, unit_out));
+                        });
                     } else { // combinatorial logics do not change output (cur)
                         rcd.run_combinatorial_logic(name);
                     }
                 }
-                let (new_o, tracer) = rcd.finalize();
-
-                // status computed from previous cycle
-                // i. e. status during the current cycle
-                let cur_status = PipeRegs::from(&self.cur_unit_out);
-
-                // status computed from current cycle
-                // i. e. status during the next cycle
-                let next_status = PipeRegs::from(&new_o);
-
-                // only update output signals of functional units
-                self.cur_unit_out = new_o;
-                cur_status.update_output(&mut self.cur_unit_out);
-
-                (next_status, tracer)
+                let (out, tracer) = rcd.finalize();
+                self.cur_unit_out = out;
+                tracer
             }
         }
     }
@@ -357,6 +333,7 @@ impl HclData {
                 type UnitIn = UnitInputSignal;
                 type UnitOut = UnitOutputSignal;
                 type Inter = IntermediateSignal;
+                type StageState = PipeRegs;
             }
 
             impl crate::framework::CpuArch for Arch {
@@ -376,10 +353,26 @@ impl HclData {
                         cur_inter: IntermediateSignal::default(),
                         cur_unit_in: UnitInputSignal::default(),
                         cur_unit_out: UnitOutputSignal::default(),
+                        cur_state: PipeRegs::default(),
+                        nex_state: PipeRegs::default(),
                         units: Units::init(memory),
                         terminate: None,
                         tty_out,
                     }
+                }
+            }
+            impl CpuSim for PipeSim<Arch> {
+                fn initiate_next_cycle(&mut self) {
+                    self.cur_state.mux(&self.nex_state);
+                }
+                fn propagate_signals(&mut self) {
+                    self.update();
+                }
+                fn is_terminate(&self) -> bool {
+                    PipeSim::_is_terminate(&self)
+                }
+                fn is_success(&self) -> bool {
+                    PipeSim::_is_success(&self)
                 }
             }
         }

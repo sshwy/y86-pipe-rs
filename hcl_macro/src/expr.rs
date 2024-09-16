@@ -293,7 +293,7 @@ impl Expr {
 }
 
 impl LValue {
-    fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
+    pub fn map(self, f: impl Fn(LValue) -> LValue + Clone) -> Self {
         f(self)
     }
 }

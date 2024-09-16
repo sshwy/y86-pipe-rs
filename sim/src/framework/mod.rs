@@ -27,8 +27,7 @@ pub enum CpuStatus {
 /// simulate the pipeline.
 pub trait CpuSim {
     /// Initiate the next cycle or the first cycle. This function should be called
-    /// at the very beginning of the simulation, or after calling [`CpuSim::propagate_signals`].
-    /// Otherwise the behavior is undefined.
+    /// after calling [`CpuSim::propagate_signals`]. Otherwise the behavior is undefined.
     fn initiate_next_cycle(&mut self);
 
     /// Propagate signals through the combinational logic circuits. This function
@@ -48,6 +47,7 @@ pub trait CpuCircuit {
     type UnitIn;
     type UnitOut;
     type Inter;
+    type StageState;
 }
 
 pub trait CpuArch: CpuCircuit {
@@ -69,11 +69,16 @@ pub enum Termination {
 
 /// Pipeline simulator. A general CPU pipeline involves several pipeline registers
 /// (flip-flops) and combinational logic circuits.
+///
+/// - Combinatorial logics: From `cur_state`, through `cur_unit_in`, `cur_inter`, `cur_unit_out`, to `nex_state`.
+/// - Clock tick: from `nex_state`, controlled by stage input signals, to `cur_state`.
 pub struct PipeSim<T: CpuArch> {
     pub(crate) circuit: PropCircuit<T>,
     pub(crate) cur_unit_in: T::UnitIn,
     pub(crate) cur_unit_out: T::UnitOut,
     pub(crate) cur_inter: T::Inter,
+    pub(crate) cur_state: T::StageState,
+    pub(crate) nex_state: T::StageState,
     pub(crate) units: T::Units,
     /// See [`PipeSim::is_terminate`].
     pub(crate) terminate: Option<Termination>,
@@ -91,5 +96,9 @@ impl<T: CpuArch> PipeSim<T> {
     #[doc(hidden)]
     pub(crate) fn _is_success(&self) -> bool {
         matches!(self.terminate, Some(Termination::Halt))
+    }
+
+    pub fn mem(&self) -> [u8; MEM_SIZE] {
+        self.units.mem()
     }
 }

@@ -10,10 +10,6 @@ use crate::framework::CpuCircuit;
 /// A node can be either a unit name or a intermediate signal name.
 pub type NameList = Vec<(bool, &'static str)>;
 
-// return (receiver, producier)
-pub type Updater<UnitIn, UnitOut, Inter> =
-    Box<dyn FnMut(&mut UnitIn, &mut Inter, &mut Tracer, UnitOut)>;
-
 #[derive(Debug, Default)]
 pub struct PropOrder {
     pub(crate) order: NameList,
@@ -189,8 +185,13 @@ impl Tracer {
     }
 }
 
+// Update input and intermediate signals from output signals.
+pub type Updater<UnitIn, UnitOut, Inter, StageState> =
+    Box<dyn FnMut(&mut UnitIn, &mut Inter, &mut StageState, &mut Tracer, &UnitOut, &StageState)>;
+
 pub struct PropUpdates<T: CpuCircuit> {
-    pub(crate) updates: BTreeMap<&'static str, Updater<T::UnitIn, T::UnitOut, T::Inter>>,
+    pub(crate) updates:
+        BTreeMap<&'static str, Updater<T::UnitIn, T::UnitOut, T::Inter, T::StageState>>,
 }
 
 impl<T: CpuCircuit> PropUpdates<T> {
@@ -198,11 +199,15 @@ impl<T: CpuCircuit> PropUpdates<T> {
         &'a mut self,
         unit_in: &'a mut T::UnitIn,
         unit_out: T::UnitOut,
+        nex_state: &'a mut T::StageState,
+        cur_state: &'a T::StageState,
         context: &'a mut T::Inter,
     ) -> Propagator<'a, T> {
         Propagator {
             unit_in,
             unit_out,
+            nex_state,
+            cur_state,
             context,
             updates: self,
             tracer: Default::default(),
@@ -233,7 +238,14 @@ impl<T: CpuCircuit> PropCircuit<T> {
     pub fn add_update(
         &mut self,
         name: &'static str,
-        func: impl FnMut(&mut T::UnitIn, &mut T::Inter, &mut Tracer, T::UnitOut) + 'static,
+        func: impl FnMut(
+                &mut T::UnitIn,
+                &mut T::Inter,
+                &mut T::StageState,
+                &mut Tracer,
+                &T::UnitOut,
+                &T::StageState,
+            ) + 'static,
     ) {
         self.updates.updates.insert(name, Box::new(func));
     }
@@ -242,8 +254,10 @@ impl<T: CpuCircuit> PropCircuit<T> {
 /// Propagator simulates the combinational logic circuits.
 pub struct Propagator<'a, T: CpuCircuit> {
     unit_in: &'a mut T::UnitIn,
-    context: &'a mut T::Inter,
     unit_out: T::UnitOut,
+    cur_state: &'a T::StageState,
+    nex_state: &'a mut T::StageState,
+    context: &'a mut T::Inter,
     updates: &'a mut PropUpdates<T>,
     tracer: Tracer,
 }
@@ -259,20 +273,22 @@ where
             func(
                 self.unit_in,
                 self.context,
+                self.nex_state,
                 &mut self.tracer,
-                self.unit_out.clone(),
+                &self.unit_out,
+                self.cur_state,
             )
         } else {
             panic!("invalid name")
         }
     }
+    /// Execute a unit.
+    pub fn run_unit(&mut self, unit_fn: impl FnOnce(&T::UnitIn, &mut T::UnitOut)) {
+        unit_fn(self.unit_in, &mut self.unit_out)
+    }
     /// Get current signals.
     pub fn signals(&self) -> (T::UnitIn, T::UnitOut) {
         (self.unit_in.clone(), self.unit_out.clone())
-    }
-    /// Update signals from outputs of a unit.
-    pub fn update_from_unit_out(&mut self, unit_out: T::UnitOut) {
-        self.unit_out = unit_out
     }
     pub fn finalize(self) -> (T::UnitOut, Tracer) {
         (self.unit_out, self.tracer)
