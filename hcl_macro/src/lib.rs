@@ -8,8 +8,9 @@ mod items;
 struct HclData {
     hardware: syn::ExprPath,
     program_counter: LValue,
+    termination: LValue,
     /// (cur, pre)
-    pub stage_alias: items::StageAlias,
+    stage_alias: items::StageAlias,
     use_items: Vec<syn::ItemUse>,
     intermediate_signals: Vec<items::SignalDef>,
 }
@@ -67,6 +68,23 @@ impl Parse for HclData {
             })
             .unwrap();
 
+        let termination = attrs
+            .iter()
+            .find_map(|attr| {
+                if attr.path().is_ident("termination") {
+                    let value = &attr.meta.require_name_value().unwrap().value;
+                    // parse value as path
+                    let syn::Expr::Path(path) = value else {
+                        panic!("program_counter attribute must be a path");
+                    };
+
+                    Some(parse_quote!(#path))
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
         let mut use_items = Vec::new();
         let mut intermediate_signals = Vec::new();
 
@@ -88,6 +106,7 @@ impl Parse for HclData {
             stage_alias,
             hardware,
             program_counter,
+            termination,
             use_items,
             intermediate_signals,
         })
@@ -339,6 +358,7 @@ impl HclData {
         let build_circuit_fn = self.render_build_circuit();
         let update_fn = self.render_update();
         let pc_name = &self.program_counter;
+        let termination = &self.termination;
 
         quote! {
             use #hardware::*;
@@ -363,14 +383,35 @@ impl HclData {
 
             impl crate::framework::PipeSim<Arch> {
                 #update_fn
+                pub fn step(&mut self) {
+                    use crate::framework::CpuSim;
+                    tracing::info!("{:=^74}", " Run Cycle ");
+                    self.propagate_signals();
+
+                    if self.tty_out {
+                        self.print_state();
+                    }
+
+                    if self.is_terminate() {
+                        if self.tty_out {
+                            println!("terminate!");
+                        }
+                    } else {
+                        self.initiate_next_cycle();
+                    }
+                }
             }
-            impl CpuSim for PipeSim<Arch> {
+            impl crate::framework::CpuSim for crate::framework::PipeSim<Arch> {
                 fn initiate_next_cycle(&mut self) {
                     self.cur_state.mux(&self.nex_state);
                 }
                 fn propagate_signals(&mut self) {
                     self.update();
                     self.cycle_count += 1;
+
+                    if self.cur_inter.#termination {
+                        self.terminate = true;
+                    }
                 }
                 fn program_counter(&self) -> u64 {
                     self.cur_inter.#pc_name

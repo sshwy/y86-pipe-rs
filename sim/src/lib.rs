@@ -6,11 +6,11 @@ pub mod isa;
 mod object;
 mod utils;
 
-pub use object::SourceInfo;
 pub use architectures::pipe_full::Arch;
 pub use asm::assemble;
 pub use asm::AssembleOption;
 pub use object::ObjectExt;
+pub use object::SourceInfo;
 pub use utils::{mem_diff, mem_print};
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ pub trait HardwareUnits {
     /// Get current memory data.
     fn mem(&self) -> [u8; MEM_SIZE];
     /// Return the registers and their values.
-    /// 
+    ///
     /// (register_code, value)
     fn registers(&self) -> Vec<(u8, u64)>;
 }
@@ -36,7 +36,8 @@ pub trait CpuSim {
 
     /// Propagate signals through the combinational logic circuits. This function
     /// should be called after [`CpuSim::initiate_next_cycle`]. Otherwise the
-    /// behavior is undefined.
+    /// behavior is undefined. This function should change the terminal state of the
+    /// simulator if the simulation is terminated.
     fn propagate_signals(&mut self);
 
     /// Get the current program counter
@@ -62,13 +63,6 @@ pub type Signals<A> = (
     <A as CpuCircuit>::Inter,
 );
 
-pub enum Termination {
-    /// Successfully halt
-    Halt,
-    /// Halt with error
-    Error,
-}
-
 /// Pipeline simulator. A general CPU pipeline involves several pipeline registers
 /// (flip-flops) and combinational logic circuits.
 ///
@@ -83,7 +77,7 @@ pub struct PipeSim<T: CpuArch> {
     pub(crate) nex_state: T::StageState,
     pub(crate) units: T::Units,
     /// See [`PipeSim::is_terminate`].
-    pub(crate) terminate: Option<Termination>,
+    pub(crate) terminate: bool,
     /// Whether to print the output to tty
     pub(crate) tty_out: bool,
     pub(crate) cycle_count: u64,
@@ -102,7 +96,7 @@ impl<T: CpuArch> PipeSim<T> {
             cur_state: T::StageState::default(),
             nex_state: T::StageState::default(),
             units: T::Units::init(memory),
-            terminate: None,
+            terminate: false,
             tty_out,
             cycle_count: 0,
         }
@@ -110,11 +104,7 @@ impl<T: CpuArch> PipeSim<T> {
 
     /// Whether the simulation is terminated
     pub fn is_terminate(&self) -> bool {
-        self.terminate.is_some()
-    }
-    /// Whether the simulation is successfully halted
-    pub fn is_success(&self) -> bool {
-        matches!(self.terminate, Some(Termination::Halt))
+        self.terminate
     }
     pub fn cycle_count(&self) -> u64 {
         self.cycle_count

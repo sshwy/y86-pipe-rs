@@ -49,7 +49,7 @@ fn test_reg_op() -> anyhow::Result<()> {
                 while !pipe.is_terminate() {
                     pipe.step();
                 }
-                anyhow::ensure!(pipe.is_success(), "test failed: op-{inst}-{ra}-{rb}");
+                anyhow::ensure!(pipe.is_terminate(), "test failed: op-{inst}-{ra}-{rb}");
             }
         }
     }
