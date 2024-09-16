@@ -248,8 +248,19 @@ impl HardwareUnits for Units {
             dmem: DataMemory { binary: cell },
         }
     }
+
     fn mem(&self) -> [u8; MEM_SIZE] {
         *self.dmem.binary.borrow()
+    }
+
+    fn registers(&self) -> Vec<(u8, u64)> {
+        self.reg_file
+            .state
+            .iter()
+            .enumerate()
+            .filter(|(id, _)| (*id as u8) != RNONE)
+            .map(|(i, &v)| (i as u8, v))
+            .collect()
     }
 }
 

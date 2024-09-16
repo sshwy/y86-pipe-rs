@@ -7,6 +7,10 @@ pub trait HardwareUnits {
     fn init(memory: [u8; MEM_SIZE]) -> Self;
     /// Get current memory data.
     fn mem(&self) -> [u8; MEM_SIZE];
+    /// Return the registers and their values.
+    /// 
+    /// (register_code, value)
+    fn registers(&self) -> Vec<(u8, u64)>;
 }
 
 pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
@@ -112,7 +116,14 @@ impl<T: CpuArch> PipeSim<T> {
     pub fn is_success(&self) -> bool {
         matches!(self.terminate, Some(Termination::Halt))
     }
+    pub fn cycle_count(&self) -> u64 {
+        self.cycle_count
+    }
     pub fn mem(&self) -> [u8; MEM_SIZE] {
         self.units.mem()
+    }
+    /// Get the registers and their values
+    pub fn registers(&self) -> Vec<(u8, u64)> {
+        self.units.registers()
     }
 }

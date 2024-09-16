@@ -6,8 +6,8 @@ use pest_derive::Parser;
 
 use crate::{
     isa::{self, reg_code},
-    object::{Object, ObjectExt, SourceInfo},
-    utils,
+    object::{LineInfo, Object, ObjectExt},
+    utils, SourceInfo,
 };
 
 #[derive(Parser)]
@@ -314,7 +314,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
     for line in lines {
         let src = line.pair.as_str().to_string();
         let mut line = line.into_iter();
-        let mut src_info = SourceInfo {
+        let mut src_info = LineInfo {
             addr: None,
             inst: None,
             label: None,
@@ -441,7 +441,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
 
     Ok(ObjectExt {
         obj,
-        source: src_infos,
+        source: SourceInfo::from(src_infos),
     })
 }
 

@@ -6,6 +6,7 @@ pub mod isa;
 mod object;
 mod utils;
 
+pub use object::SourceInfo;
 pub use architectures::pipe_full::Arch;
 pub use asm::assemble;
 pub use asm::AssembleOption;

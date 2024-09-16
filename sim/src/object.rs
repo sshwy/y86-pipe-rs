@@ -47,7 +47,7 @@ macro_rules! h2 {
     };
 }
 
-impl SourceInfo {
+impl LineInfo {
     pub fn write_object(&self, obj: &mut Object) {
         if let Some(addr) = self.addr {
             let addr = addr as usize;
@@ -110,13 +110,13 @@ impl SourceInfo {
 
 /// A source info is one line of the .yo file.
 #[derive(Debug, Clone)]
-pub struct SourceInfo {
-    pub(crate) addr: Option<u64>,
-    pub(crate) inst: Option<asm::Inst<asm::Imm>>,
-    pub(crate) label: Option<String>,
+pub struct LineInfo {
+    pub addr: Option<u64>,
+    pub inst: Option<asm::Inst<asm::Imm>>,
+    pub label: Option<String>,
     // width and data
-    pub(crate) data: Option<(u8, asm::Imm)>,
-    pub(crate) src: String,
+    pub data: Option<(u8, asm::Imm)>,
+    pub src: String,
 }
 
 /// object file
@@ -143,12 +143,35 @@ impl Object {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct SourceInfo(Vec<LineInfo>);
+
+impl From<Vec<LineInfo>> for SourceInfo {
+    fn from(v: Vec<LineInfo>) -> Self {
+        Self(v)
+    }
+}
+
+impl SourceInfo {
+    /// Get the line info by line number (start from 1)
+    pub fn get_line(&self, line: i64) -> Option<&LineInfo> {
+        assert!(line > 0);
+        self.0.get(line as usize - 1)
+    }
+    pub fn get_line_number_by_addr(&self, addr: u64) -> Option<i64> {
+        self.0
+            .iter()
+            .position(|x| x.addr == Some(addr))
+            .map(|x| x as i64 + 1)
+    }
+}
+
 /// object file with source info
 #[derive(Default)]
 pub struct ObjectExt {
     pub obj: Object,
     /// annotate each line with its address
-    pub source: Vec<SourceInfo>,
+    pub source: SourceInfo,
 }
 
 impl Default for Object {
@@ -163,7 +186,7 @@ impl Default for Object {
 impl Display for ObjectExt {
     /// display yo format
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for src in &self.source {
+        for src in &self.source.0 {
             if let Some(addr) = src.addr {
                 let addr = addr as usize;
                 write!(f, "{:#06x}: ", addr)?;
