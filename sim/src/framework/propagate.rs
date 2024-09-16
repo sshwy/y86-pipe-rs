@@ -21,30 +21,27 @@ pub struct PropOrder {
 pub fn topo<Node: Copy + Eq + Hash + Debug>(
     nodes: impl Iterator<Item = Node> + Clone,
     edges: impl Iterator<Item = (Node, Node)> + Clone,
-) -> Vec<(Node, i32)> {
-    let mut degree_level: HashMap<Node, (i32, i32)> = HashMap::default();
+) -> Vec<Node> {
+    let mut degree_level: HashMap<Node, i32> = HashMap::default();
     for (_, to) in edges.clone() {
         let entry = degree_level.entry(to).or_default();
-        entry.0 += 1;
+        *entry += 1;
     }
     let mut que: VecDeque<Node> = VecDeque::new();
     let mut levels = Vec::new();
     for node in nodes {
-        if degree_level.get(&node).cloned().unwrap_or_default().0 == 0 {
+        if degree_level.get(&node).cloned().unwrap_or_default() == 0 {
             que.push_back(node)
         }
     }
     while let Some(head) = que.pop_front() {
-        let level = degree_level.remove(&head).map(|o| o.1).unwrap_or(0);
-        levels.push((head, level));
-        // let mut is_depended = false;
+        degree_level.remove(&head);
+        levels.push(head);
         for (from, to) in edges.clone() {
             if from == head {
-                // is_depended = true;
                 let entry = degree_level.get_mut(&to).unwrap();
-                entry.0 -= 1;
-                entry.1 = entry.1.max(level + 1);
-                if entry.0 == 0 {
+                *entry -= 1;
+                if *entry == 0 {
                     que.push_back(to);
                 }
             }
@@ -62,16 +59,13 @@ pub struct PropOrderBuilder {
     unit_nodes: Vec<String>,
     nodes: BTreeSet<String>,
     edges: Vec<(String, String)>,
-    stage_units: BTreeSet<&'static str>,
     /// (name, body)
     deps: Vec<(String, String)>,
     rev_deps: Vec<(String, String)>,
-    output_prefix: &'static str,
-    input_prefix: &'static str,
 }
 
 impl PropOrderBuilder {
-    pub fn new(output_prefix: &'static str, input_prefix: &'static str) -> Self {
+    pub fn new() -> Self {
         Self {
             nodes: Default::default(),
             runnable_nodes: Default::default(),
@@ -79,9 +73,6 @@ impl PropOrderBuilder {
             deps: Default::default(),
             rev_deps: Default::default(),
             edges: Default::default(),
-            stage_units: Default::default(),
-            output_prefix,
-            input_prefix,
         }
     }
     fn add_edge(&mut self, from: String, to: String) {
@@ -93,6 +84,7 @@ impl PropOrderBuilder {
     pub fn add_rev_deps(&mut self, name: &'static str, body: &'static str) {
         self.rev_deps.push((name.to_string(), body.to_string()))
     }
+    /// Set unit `name` as runnable
     pub fn add_unit_node(&mut self, unit_name: &'static str) {
         self.runnable_nodes.push((true, unit_name));
         self.unit_nodes.push(unit_name.to_string());
@@ -105,21 +97,6 @@ impl PropOrderBuilder {
         let full_name = String::from(unit_name) + "." + field_name;
         self.add_edge(unit_name.to_string(), full_name.to_string());
     }
-    /// Stage units pass the current input data to the next cycle.
-    /// These units should be run at the end.
-    pub fn add_unit_stage(&mut self, unit_name: &'static str, field_name: &'static str) {
-        self.nodes
-            .insert(String::from(self.output_prefix) + "." + unit_name + "." + field_name);
-        self.nodes
-            .insert(String::from(self.input_prefix) + "." + unit_name + "." + field_name);
-        // link input to unit, without output
-        self.add_edge(
-            String::from(self.input_prefix) + "." + unit_name + "." + field_name,
-            unit_name.to_string(),
-        );
-        self.stage_units.insert(unit_name);
-    }
-    /// Set unit `name` as runnable, which depends on other units in `body`.
     pub fn add_update(&mut self, name: &'static str, body: &'static str) {
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
@@ -157,15 +134,8 @@ impl PropOrderBuilder {
         let levels = topo(self.nodes.iter(), self.edges.iter().map(|(a, b)| (a, b)));
         let order: Vec<(bool, &'static str)> = levels
             .iter()
-            .filter_map(|(node, _)| self.runnable_nodes.iter().find(|(_, p)| p == node).copied())
+            .filter_map(|node| self.runnable_nodes.iter().find(|(_, p)| p == node).copied())
             .collect();
-
-        let (mut last, mut order): (NameList, _) = order
-            .into_iter()
-            .partition(|o| o.0 && self.stage_units.contains(o.1));
-
-        // put stage units at the end
-        order.append(&mut last);
 
         // order
         PropOrder { order }

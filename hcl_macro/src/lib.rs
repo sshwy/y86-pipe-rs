@@ -166,7 +166,7 @@ impl HclData {
 
                 // cur: o, nex: i
                 let order = {
-                    let mut g = PropOrderBuilder::new("o", "i");
+                    let mut g = PropOrderBuilder::new();
                     // hardware setup
                     hardware_setup(&mut g);
                     #stmts

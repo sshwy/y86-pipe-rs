@@ -183,7 +183,6 @@ macro_rules! define_units {
             builder.add_unit_node(stringify!($unit_short_name));
             $( $( builder.add_unit_input(stringify!($unit_short_name), stringify!($iname)); )* )?
             $( $( builder.add_unit_output(stringify!($unit_short_name), stringify!($oname)); )* )?
-            // $( $( builder.add_unit_stage(stringify!($unit_short_name), stringify!($pname)); )* )?
             )*
         }
     };
