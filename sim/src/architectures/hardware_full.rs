@@ -1,4 +1,5 @@
-//! hardware behavior definition
+//! This module defines hardware units used in the classic RISC-V pipeline.
+//! The units are defined using the `define_units!` macro.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -47,7 +48,6 @@ define_units! {
     PipeRegs {
         /// Fetch stage registers.
         /// note that it's not possible to bubble (see hcl)
-        // .input(stall: bool, bubble: bool)
         Fstage f {
             pred_pc: u64 = 0
         }
@@ -175,7 +175,7 @@ define_units! {
             *sf = *s_sf;
             *of = *s_of;
             *zf = *s_zf;
-            tracing::info!("a = {:#x}, b = {:#x}, e = {:#x}, sf = {sf}, of = {of}, zf = {zf}", a, b, e);
+            tracing::info!("CC: a = {:#x}, b = {:#x}, e = {:#x}, sf = {sf}, of = {of}, zf = {zf}", a, b, e);
         }
 
         Condition cond {
@@ -254,7 +254,7 @@ impl Units {
         use binutils::clap::builder::styling::*;
 
         fn fmt_val(val: u64) -> String {
-            let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Black)));
+            let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
             if val == 0 {
                 format!("{s}{:016x}{s:#}", 0)
             } else {
@@ -267,7 +267,7 @@ impl Units {
         }
 
         format!(
-            "rax {rax} rbx {rbx} rcx {rcx} rdx {rdx}\nrsi {rsi} rdi {rdi} rsp {rsp} rbp {rbp}",
+            "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}",
             rax = fmt_val(self.reg_file.state[RAX as usize]),
             rbx = fmt_val(self.reg_file.state[RBX as usize]),
             rcx = fmt_val(self.reg_file.state[RCX as usize]),

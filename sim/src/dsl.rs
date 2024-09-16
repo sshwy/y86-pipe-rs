@@ -63,7 +63,12 @@ macro_rules! define_units {
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct $pr_name {
                 $(pub $pname: $ptype, )*
+                /// A special input of the pipeline register. If `bubble` is true,
+                /// during the rise edge of the clock, registers in this stage will
+                /// be reset to their default values.
                 pub bubble: bool,
+                /// If `stall` is true, the registers in this stage will keep the
+                /// same value as the previous cycle.
                 pub stall: bool,
             }
             impl Default for $pr_name {
