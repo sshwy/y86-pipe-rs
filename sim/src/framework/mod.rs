@@ -47,14 +47,15 @@ pub trait CpuSim {
 
 // here we use trait to collect the types
 pub trait CpuCircuit {
-    type UnitIn;
-    type UnitOut;
-    type Inter;
-    type StageState;
+    type UnitIn: Default;
+    type UnitOut: Default;
+    type Inter: Default;
+    type StageState: Default;
 }
 
-pub trait CpuArch: CpuCircuit {
+pub trait CpuArch: CpuCircuit + Sized {
     type Units: HardwareUnits;
+    fn build_circuit() -> PropCircuit<Self>;
 }
 
 pub type Signals<A> = (
@@ -87,9 +88,28 @@ pub struct PipeSim<T: CpuArch> {
     pub(crate) terminate: Option<Termination>,
     /// Whether to print the output to tty
     pub(crate) tty_out: bool,
+    pub(crate) cycle_count: u64,
 }
 
 impl<T: CpuArch> PipeSim<T> {
+    /// Initialize the simulator with given memory
+    ///
+    /// tty_out: whether to print rich-text information
+    pub fn new(memory: [u8; crate::framework::MEM_SIZE], tty_out: bool) -> Self {
+        Self {
+            circuit: T::build_circuit(),
+            cur_inter: T::Inter::default(),
+            cur_unit_in: T::UnitIn::default(),
+            cur_unit_out: T::UnitOut::default(),
+            cur_state: T::StageState::default(),
+            nex_state: T::StageState::default(),
+            units: T::Units::init(memory),
+            terminate: None,
+            tty_out,
+            cycle_count: 0,
+        }
+    }
+
     // This function is called by hcl proc macro
     #[doc(hidden)]
     pub(crate) fn _is_terminate(&self) -> bool {

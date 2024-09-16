@@ -180,7 +180,7 @@ impl HclData {
             .unwrap_or_default();
 
         quote! {
-            pub(crate) fn build_circuit() -> crate::framework::PropCircuit<Arch> {
+            fn build_circuit() -> crate::framework::PropCircuit<Arch> {
                 use crate::framework::*;
 
                 // cur: o, nex: i
@@ -358,28 +358,11 @@ impl HclData {
 
             impl crate::framework::CpuArch for Arch {
                 type Units = Units;
+                #build_circuit_fn
             }
 
             impl crate::framework::PipeSim<Arch> {
-                #build_circuit_fn
                 #update_fn
-
-                /// Initialize the simulator with given memory
-                ///
-                /// tty_out: whether to print rich-text information
-                pub fn new(memory: [u8; crate::framework::MEM_SIZE], tty_out: bool) -> Self {
-                    Self {
-                        circuit: Self::build_circuit(),
-                        cur_inter: IntermediateSignal::default(),
-                        cur_unit_in: UnitInputSignal::default(),
-                        cur_unit_out: UnitOutputSignal::default(),
-                        cur_state: PipeRegs::default(),
-                        nex_state: PipeRegs::default(),
-                        units: Units::init(memory),
-                        terminate: None,
-                        tty_out,
-                    }
-                }
             }
             impl CpuSim for PipeSim<Arch> {
                 fn initiate_next_cycle(&mut self) {
@@ -387,6 +370,7 @@ impl HclData {
                 }
                 fn propagate_signals(&mut self) {
                     self.update();
+                    self.cycle_count += 1;
                 }
                 fn is_terminate(&self) -> bool {
                     PipeSim::_is_terminate(&self)

@@ -185,7 +185,7 @@ impl<T: CpuCircuit> PropUpdates<T> {
     }
 }
 
-/// Simulate the combinational logic circuits by update functions.
+/// Simulate the combinational logic circuits using update functions.
 pub struct PropCircuit<T: CpuCircuit> {
     pub updates: PropUpdates<T>,
     pub order: PropOrder,
