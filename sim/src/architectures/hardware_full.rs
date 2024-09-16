@@ -75,7 +75,11 @@ define_units! {
     FunctionalUnits {
         InstructionMemory imem { // with split
             .input(pc: u64)
-            .output(error: bool, icode: u8, ifun: u8, align: [u8; 9])
+            .output(
+                /// This signal is set to true if the address is invalid.
+                /// (i.e. the address is out of the memory range)
+                error: bool, icode: u8, ifun: u8, align: [u8; 9]
+            )
             binary: Rc<RefCell<[u8; MEM_SIZE]>>
         } {
             let binary: &[u8; MEM_SIZE] = &binary.borrow();

@@ -7,6 +7,7 @@ mod items;
 
 struct HclData {
     hardware: syn::ExprPath,
+    program_counter: LValue,
     /// (cur, pre)
     pub stage_alias: items::StageAlias,
     use_items: Vec<syn::ItemUse>,
@@ -49,6 +50,23 @@ impl Parse for HclData {
             })
             .unwrap_or_default();
 
+        let program_counter = attrs
+            .iter()
+            .find_map(|attr| {
+                if attr.path().is_ident("program_counter") {
+                    let value = &attr.meta.require_name_value().unwrap().value;
+                    // parse value as path
+                    let syn::Expr::Path(path) = value else {
+                        panic!("program_counter attribute must be a path");
+                    };
+
+                    Some(parse_quote!(#path))
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
         let mut use_items = Vec::new();
         let mut intermediate_signals = Vec::new();
 
@@ -69,6 +87,7 @@ impl Parse for HclData {
         Ok(Self {
             stage_alias,
             hardware,
+            program_counter,
             use_items,
             intermediate_signals,
         })
@@ -319,6 +338,7 @@ impl HclData {
         let intermediate_signal_struct = self.render_intermediate_signal_struct();
         let build_circuit_fn = self.render_build_circuit();
         let update_fn = self.render_update();
+        let pc_name = &self.program_counter;
 
         quote! {
             use #hardware::*;
@@ -373,6 +393,9 @@ impl HclData {
                 }
                 fn is_success(&self) -> bool {
                     PipeSim::_is_success(&self)
+                }
+                fn program_counter(&self) -> u64 {
+                    self.cur_inter.#pc_name
                 }
             }
         }

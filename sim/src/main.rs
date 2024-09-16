@@ -71,7 +71,7 @@ fn main() -> Result<()> {
         let mut pipe = PipeSim::new(obj.obj.init_mem(), true);
 
         while !pipe.is_terminate() {
-            let _out = pipe.step();
+            pipe.step();
         }
 
         mem_diff(&obj.obj.init_mem(), &pipe.mem());
@@ -86,6 +86,7 @@ fn main() -> Result<()> {
         };
         std::fs::write(&output_path, format!("{}", obj))
             .with_context(|| format!("could not write file `{}`", &output_path))?;
+        println!("writing to file `{}`", &output_path);
     }
     Ok(())
 }

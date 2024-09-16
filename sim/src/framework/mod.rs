@@ -40,6 +40,9 @@ pub trait CpuSim {
 
     /// Whether the simulation is successfully halted
     fn is_success(&self) -> bool;
+
+    /// Get the current program counter
+    fn program_counter(&self) -> u64;
 }
 
 // here we use trait to collect the types
