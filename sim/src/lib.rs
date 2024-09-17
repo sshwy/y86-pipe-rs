@@ -1,4 +1,4 @@
-mod architectures;
+pub mod architectures;
 mod asm;
 mod dsl;
 pub mod framework;
@@ -6,7 +6,6 @@ pub mod isa;
 mod object;
 mod utils;
 
-pub use architectures::pipe_full::Arch;
 pub use asm::assemble;
 pub use asm::AssembleOption;
 pub use object::ObjectExt;

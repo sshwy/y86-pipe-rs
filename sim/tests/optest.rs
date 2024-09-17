@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use interpolator::{format, Formattable};
+use y86_sim::architectures::pipe_full::Arch;
 use y86_sim::framework::PipeSim;
 
 #[allow(non_upper_case_globals)]
@@ -45,7 +46,7 @@ fn test_reg_op() -> anyhow::Result<()> {
 
                 let src = format(source, args)?;
                 let obj = make_obj(&src)?;
-                let mut pipe = PipeSim::new(obj.obj.init_mem(), false);
+                let mut pipe = PipeSim::<Arch>::new(obj.obj.init_mem(), false);
                 while !pipe.is_terminate() {
                     pipe.step();
                 }
