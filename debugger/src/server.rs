@@ -20,14 +20,20 @@ enum ServerStatus {
     ServeReq,
 }
 
+pub struct Inner {
+    source_path: PathBuf,
+    source_info: y86_sim::SourceInfo,
+    source_name: String,
+    scopes: Vec<types::Scope>,
+    stage_info: Vec<y86_sim::framework::StageInfo>,
+    sim: y86_sim::framework::PipeSim<y86_sim::Arch>,
+}
+
 pub struct DebugServer<R: Read, W: Write> {
-    sim: Option<y86_sim::framework::PipeSim<y86_sim::Arch>>,
+    inner: Option<Inner>,
     /// Lines of breakpoints
     breakpoints: Vec<types::Breakpoint>,
     /// Path of the source file (this debugger only supports single source file)
-    source_path: Option<PathBuf>,
-    source_info: Option<y86_sim::SourceInfo>,
-    source_name: Option<String>,
     server: dap::server::Server<R, W>,
     status: ServerStatus,
 }
@@ -35,6 +41,13 @@ pub struct DebugServer<R: Read, W: Write> {
 const THREAD_ID: i64 = 1;
 const STACK_FRAME_ID: i64 = 1;
 const REG_SCOPE_VAR_REF: i64 = 1;
+
+const VAR_PRESENTATION_HINT: types::VariablePresentationHint = types::VariablePresentationHint {
+    kind: Some(types::VariablePresentationHintKind::Data),
+    attributes: None,
+    visibility: None,
+    lazy: Some(false),
+};
 
 #[derive(Deserialize)]
 struct LaunchOption {
@@ -44,20 +57,17 @@ struct LaunchOption {
 impl<R: Read, W: Write> DebugServer<R, W> {
     pub fn new(input: R, output: W) -> Self {
         Self {
-            sim: None,
+            inner: None,
             server: dap::server::Server::new(BufReader::new(input), BufWriter::new(output)),
             breakpoints: Vec::new(),
-            source_path: None,
-            source_info: None,
-            source_name: None,
             status: ServerStatus::ServeReq,
         }
     }
 
-    fn get_src_info(&self) -> &y86_sim::SourceInfo {
-        self.source_info
+    fn inner(&self) -> anyhow::Result<&Inner> {
+        self.inner
             .as_ref()
-            .expect("source info not initialized")
+            .ok_or(anyhow::anyhow!("program data not initialized"))
     }
 
     fn init_program(&mut self, program: PathBuf) -> anyhow::Result<()> {
@@ -65,25 +75,67 @@ impl<R: Read, W: Write> DebugServer<R, W> {
 
         let src = std::fs::read_to_string(&program)?;
         let a = y86_sim::assemble(&src, y86_sim::AssembleOption::default())?;
+
         let sim = y86_sim::framework::PipeSim::new(a.obj.init_mem(), false);
-        self.sim = Some(sim);
-        self.source_name = Some(program.file_name().unwrap().to_string_lossy().to_string());
-        self.source_path = Some(program);
-        self.source_info = Some(a.source);
+        let source_path = program.clone();
+        let source_info = a.source;
+        let source_name = program.file_name().unwrap().to_string_lossy().to_string();
+        let main_source = types::Source {
+            name: Some(source_name.clone()),
+            path: Some(source_path.display().to_string()),
+            presentation_hint: Some(types::PresentationHint::Normal),
+            ..Default::default()
+        };
+
+        let mut scopes: Vec<_> = sim
+            .get_stage_info()
+            .into_iter()
+            .enumerate()
+            .map(|(index, s)| types::Scope {
+                name: s.name.to_string(),
+                presentation_hint: Some(types::ScopePresentationhint::Locals),
+                variables_reference: (index + 2) as i64,
+                expensive: false,
+                source: Some(main_source.clone()),
+                ..Default::default()
+            })
+            .collect();
+
+        scopes.insert(
+            0,
+            types::Scope {
+                name: "Registers".to_string(),
+                presentation_hint: Some(types::ScopePresentationhint::Registers),
+                variables_reference: REG_SCOPE_VAR_REF,
+                expensive: false,
+                source: Some(self.main_source()),
+                ..Default::default()
+            },
+        );
+
+        let stage_info = sim.get_stage_info();
+
+        self.inner = Some(Inner {
+            source_path,
+            source_info,
+            source_name,
+            scopes,
+            stage_info,
+            sim,
+        });
 
         Ok(())
     }
 
     fn main_source(&self) -> types::Source {
         types::Source {
-            name: self.source_name.clone(),
-            path: self.source_path.clone().map(|p| p.display().to_string()),
-            source_reference: None,
+            name: self.inner.as_ref().map(|i| i.source_name.clone()),
+            path: self
+                .inner
+                .as_ref()
+                .map(|p| p.source_path.display().to_string()),
             presentation_hint: Some(types::PresentationHint::Normal),
-            origin: None,
-            sources: None,
-            adapter_data: None,
-            checksums: None,
+            ..Default::default()
         }
     }
 
@@ -113,23 +165,23 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                     bail!("missing breakpoints");
                 };
 
-                let source_path = PathBuf::from(
-                    args.source
-                        .path
-                        .clone()
-                        .ok_or(anyhow::anyhow!("missing source name"))?,
-                );
-                if Some(source_path) != self.source_path {
+                let source_path = args
+                    .source
+                    .path
+                    .clone()
+                    .ok_or(anyhow::anyhow!("missing source name"))?;
+                let source = self.main_source();
+                if Some(source_path) != source.path {
                     bail!("source path mismatch");
                 }
 
-                let srcinfo = self.get_src_info();
+                let inner = self.inner()?;
 
                 let bps: Vec<types::Breakpoint> = breakpoints
                     .into_iter()
                     .map(|b| {
                         let verified = true;
-                        let ln = srcinfo.get_line(b.line).unwrap();
+                        let ln = inner.source_info.get_line(b.line).unwrap();
                         let message = ln.addr.map(|a| format!("addr: {:#x}", a));
 
                         let Some(addr) = ln.addr else {
@@ -144,13 +196,9 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                             id: Some(addr as i64),
                             verified,
                             message,
-                            source: Some(self.main_source()),
+                            source: Some(source.clone()),
                             line: Some(b.line),
-                            column: None,
-                            end_line: None,
-                            end_column: None,
-                            instruction_reference: None,
-                            offset: None,
+                            ..Default::default()
                         }
                     })
                     .collect();
@@ -204,14 +252,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                         ServerStatus::ServeReq,
                     ));
                 }
-                let sim = self
-                    .sim
-                    .as_ref()
-                    .ok_or(anyhow::anyhow!("simulator not initialized"))?;
-                let srcinfo = self
-                    .source_info
-                    .as_ref()
-                    .ok_or(anyhow::anyhow!("source info not initialized"))?;
+                let inner = self.inner()?;
                 // currently we don't have stack trace, thus we return a single frame
                 Ok((
                     req.success(ResponseBody::StackTrace(responses::StackTraceResponse {
@@ -219,16 +260,13 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                             id: STACK_FRAME_ID,
                             name: "current".to_string(),
                             source: Some(self.main_source()),
-                            line: srcinfo
-                                .get_line_number_by_addr(sim.program_counter())
+                            line: inner
+                                .source_info
+                                .get_line_number_by_addr(inner.sim.program_counter())
                                 .unwrap_or_default(),
-                            column: 0,
-                            end_line: None,
-                            end_column: None,
                             can_restart: Some(false),
-                            instruction_pointer_reference: None,
-                            module_id: None,
                             presentation_hint: Some(types::StackFramePresentationhint::Normal),
+                            ..Default::default()
                         }],
                         total_frames: None,
                     })),
@@ -241,54 +279,49 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 }
                 Ok((
                     req.success(ResponseBody::Scopes(responses::ScopesResponse {
-                        scopes: vec![types::Scope {
-                            name: "Registers".to_string(),
-                            presentation_hint: Some(types::ScopePresentationhint::Registers),
-                            variables_reference: REG_SCOPE_VAR_REF,
-                            named_variables: None,
-                            indexed_variables: None,
-                            expensive: false,
-                            source: Some(self.main_source()),
-                            line: None,
-                            column: None,
-                            end_line: None,
-                            end_column: None,
-                        }],
+                        scopes: self.inner()?.scopes.clone(),
                     })),
                     ServerStatus::ServeReq,
                 ))
             }
             Command::Variables(args) => {
-                if args.variables_reference != REG_SCOPE_VAR_REF {
-                    bail!("invalid variable reference");
-                }
-                let sim = self
-                    .sim
-                    .as_ref()
-                    .ok_or(anyhow::anyhow!("simulator not initialized"))?;
-                let regs = sim.registers();
-                let vars = regs
-                    .iter()
-                    .map(|(reg, val)| {
-                        let value = format!("{:#x}", val);
-                        types::Variable {
-                            name: y86_sim::isa::reg_code::name_of(*reg).to_string(),
-                            value,
-                            type_field: None,
-                            presentation_hint: Some(types::VariablePresentationHint {
-                                kind: Some(types::VariablePresentationHintKind::Data),
-                                attributes: None,
-                                visibility: None,
-                                lazy: Some(false),
-                            }),
-                            evaluate_name: None,
-                            variables_reference: 0,
-                            named_variables: None,
-                            indexed_variables: None,
-                            memory_reference: None,
-                        }
-                    })
-                    .collect();
+                let inner = self.inner()?;
+
+                // register scope
+                let vars = if args.variables_reference == REG_SCOPE_VAR_REF {
+                    let regs = inner.sim.registers();
+                    regs.iter()
+                        .map(|(reg, val)| {
+                            let value = format!("{:#x}", val);
+                            types::Variable {
+                                name: y86_sim::isa::reg_code::name_of(*reg).to_string(),
+                                value,
+                                presentation_hint: Some(VAR_PRESENTATION_HINT),
+                                ..Default::default()
+                            }
+                        })
+                        .collect()
+                } else {
+                    // scopes of each stage
+                    let index = args.variables_reference - 2;
+                    if index < 0 {
+                        bail!("invalid variables reference {index}");
+                    }
+                    let stage = inner
+                        .stage_info
+                        .get(index as usize)
+                        .ok_or(anyhow::anyhow!("invalid stage index {index}"))?;
+                    stage
+                        .signals
+                        .iter()
+                        .map(|(name, val)| types::Variable {
+                            name: name.to_string(),
+                            value: val.clone(),
+                            presentation_hint: Some(VAR_PRESENTATION_HINT),
+                            ..Default::default()
+                        })
+                        .collect()
+                };
                 Ok((
                     req.success(ResponseBody::Variables(responses::VariablesResponse {
                         variables: vars,
@@ -380,10 +413,11 @@ impl<R: Read, W: Write> DebugServer<R, W> {
     }
 
     fn run_prog(&mut self, kind: RunProgKind) -> anyhow::Result<()> {
-        let sim = self
-            .sim
+        let inner = self
+            .inner
             .as_mut()
-            .ok_or(anyhow::anyhow!("simulator not initialized"))?;
+            .ok_or(anyhow::anyhow!("program data not initialized"))?;
+        let sim = &mut inner.sim;
 
         // start the simulation loop
         loop {
@@ -411,15 +445,12 @@ impl<R: Read, W: Write> DebugServer<R, W> {
             sim.initiate_next_cycle();
             sim.propagate_signals();
 
-            let srcinfo = self
-                .source_info
-                .as_ref()
-                .ok_or(anyhow::anyhow!("source info not initialized"))?;
             let pc = sim.program_counter();
 
             if let Some(bp) = self.breakpoints.iter().find(|bp| {
                 let Some(bp_ln) = bp.line else { return false };
-                srcinfo
+                inner
+                    .source_info
                     .get_line_number_by_addr(pc)
                     .map(|ln| ln == bp_ln)
                     .unwrap_or(false)
@@ -469,6 +500,12 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 }
                 ServerStatus::RunProg(kind) => {
                     self.run_prog(kind)?;
+                    // After the program is stopped, we need to update the stage info
+                    let inner = self
+                        .inner
+                        .as_mut()
+                        .ok_or(anyhow::anyhow!("program data not initialized"))?;
+                    inner.stage_info = inner.sim.get_stage_info();
                 }
             }
         }
