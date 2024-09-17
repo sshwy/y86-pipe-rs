@@ -180,7 +180,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 let inner = self.inner()?;
 
                 let bps: Vec<types::Breakpoint> = breakpoints
-                    .into_iter()
+                    .iter()
                     .map(|b| {
                         let verified = true;
                         let ln = inner.source_info.get_line(b.line).unwrap();
@@ -416,7 +416,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
             self.server
                 .send_event(Event::Stopped(events::StoppedEventBody {
                     reason: types::StoppedEventReason::Entry,
-                    description: Some(format!("Stop at beginning")),
+                    description: Some("Stop at beginning".to_string()),
                     thread_id: Some(THREAD_ID),
                     preserve_focus_hint: Some(false),
                     text: None,
@@ -440,7 +440,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 self.server
                     .send_event(Event::Stopped(events::StoppedEventBody {
                         reason: types::StoppedEventReason::Pause,
-                        description: Some(format!("Pause on termination")),
+                        description: Some("Pause on termination".to_string()),
                         thread_id: Some(THREAD_ID),
                         preserve_focus_hint: None,
                         text: Some(format!(
@@ -474,7 +474,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 self.server
                     .send_event(Event::Stopped(events::StoppedEventBody {
                         reason: types::StoppedEventReason::Breakpoint,
-                        description: Some(format!("Stop at breakpoint")),
+                        description: Some("Stop at breakpoint".to_string()),
                         thread_id: Some(THREAD_ID),
                         preserve_focus_hint: Some(false),
                         text: Some(format!("pc = {pc:#x}, cycle count = {}", sim.cycle_count())),
@@ -489,7 +489,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 self.server
                     .send_event(Event::Stopped(events::StoppedEventBody {
                         reason: types::StoppedEventReason::Step,
-                        description: Some(format!("Stop at next step")),
+                        description: Some("Stop at next step".to_string()),
                         thread_id: Some(THREAD_ID),
                         preserve_focus_hint: Some(false),
                         text: Some(format!("pc = {pc:#x}, cycle count = {}", sim.cycle_count())),

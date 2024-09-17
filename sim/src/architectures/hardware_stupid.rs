@@ -1,5 +1,4 @@
-//! This module defines hardware units used in the classic RISC-V pipeline.
-//! The units are defined using the `define_units!` macro.
+//! This module defines hardware units used in the stupid pipeline.
 
 use std::cell::RefCell;
 use std::rc::Rc;

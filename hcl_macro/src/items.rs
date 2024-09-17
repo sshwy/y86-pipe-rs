@@ -229,7 +229,7 @@ impl Parse for SignalDef {
         let name: syn::Ident = input.parse()?;
         let _ = input.parse::<syn::Token![=]>()?;
         let source: SignalSource = input.parse()?;
-        let destinations = if let Ok(_) = input.parse::<syn::Token![->]>() {
+        let destinations = if input.parse::<syn::Token![->]>().is_ok() {
             if let Ok(dest) = input.parse() {
                 vec![dest]
             } else {

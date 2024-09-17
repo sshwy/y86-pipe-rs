@@ -2,7 +2,8 @@
 //! halt if they are all 0 (the halt instruction code).
 //!
 //! Obviously this pipeline does not follow the RISC-V ISA, so we prepare
-//! a special stupid "instruction memory" for it :)
+//! a special stupid "instruction memory" for it. To handle pc increment, we
+//! ship an ALU with it.
 
 use crate::framework::CpuSim;
 

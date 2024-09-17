@@ -246,7 +246,7 @@ impl HclData {
 
         let mapper = |mut lv: LValue| -> LValue {
             if inter_names.contains(&&lv.0[0]) {
-                lv.0.insert(0, inter.clone().into());
+                lv.0.insert(0, inter.clone());
             } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
                 lv.0[0] = cur.clone();
                 lv.0.insert(0, format_ident!("p_"));
@@ -273,7 +273,7 @@ impl HclData {
                     .source
                     .lvalues()
                     .into_iter()
-                    .map(mapper.clone())
+                    .map(mapper)
                     .collect::<Punctuated<LValue, Token![,]>>();
 
                 let update_stmts = quote! {

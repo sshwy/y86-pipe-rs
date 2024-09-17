@@ -3,11 +3,11 @@ use binutils::clap::builder::styling::*;
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {
-    if let Some(r) = s.parse().ok() {
+    if let Ok(r) = s.parse() {
         return Some(r);
     }
-    if s.starts_with("0x") {
-        return u64::from_str_radix(&s[2..], 16).ok();
+    if let Ok(r) = u64::from_str_radix("0x", 16) {
+        return Some(r);
     }
     None
 }
@@ -90,9 +90,7 @@ pub fn format_reg_val(val: u64) -> String {
         format!("{s}{:016x}{s:#}", 0)
     } else {
         let num = format!("{val:x}");
-        let prefix = std::iter::repeat('0')
-            .take(16 - num.len())
-            .collect::<String>();
+        let prefix = "0".repeat(16 - num.len());
         format!("{s}{}{s:#}{}", prefix, num)
     }
 }

@@ -64,6 +64,12 @@ pub struct PropOrderBuilder {
     rev_deps: Vec<(String, String)>,
 }
 
+impl Default for PropOrderBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PropOrderBuilder {
     pub fn new() -> Self {
         Self {
@@ -156,12 +162,19 @@ impl Tracer {
 }
 
 // Update input and intermediate signals from output signals.
-pub type Updater<UnitIn, UnitOut, Inter, StageState> =
-    Box<dyn FnMut(&mut UnitIn, &mut Inter, &mut StageState, &mut Tracer, &UnitOut, &StageState)>;
+pub type Updater<T> = Box<
+    dyn FnMut(
+        &mut <T as CpuCircuit>::UnitIn,
+        &mut <T as CpuCircuit>::Inter,
+        &mut <T as CpuCircuit>::StageState,
+        &mut Tracer,
+        &<T as CpuCircuit>::UnitOut,
+        &<T as CpuCircuit>::StageState,
+    ),
+>;
 
 pub struct PropUpdates<T: CpuCircuit> {
-    pub(crate) updates:
-        BTreeMap<&'static str, Updater<T::UnitIn, T::UnitOut, T::Inter, T::StageState>>,
+    pub(crate) updates: BTreeMap<&'static str, Updater<T>>,
 }
 
 impl<T: CpuCircuit> PropUpdates<T> {
