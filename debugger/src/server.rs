@@ -5,12 +5,14 @@ use std::{
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
 };
+use y86_sim::architectures::pipe_full::Arch;
 use y86_sim::framework::CpuSim;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunProgKind {
     SingleStep,
     Run,
+    InitialRun,
 }
 
 enum ServerStatus {
@@ -26,7 +28,7 @@ pub struct Inner {
     source_name: String,
     scopes: Vec<types::Scope>,
     stage_info: Vec<y86_sim::framework::StageInfo>,
-    sim: y86_sim::framework::PipeSim<y86_sim::architectures::pipe_full::Arch>,
+    sim: y86_sim::framework::PipeSim<Arch>,
 }
 
 pub struct DebugServer<R: Read, W: Write> {
@@ -76,10 +78,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         let src = std::fs::read_to_string(&program)?;
         let a = y86_sim::assemble(&src, y86_sim::AssembleOption::default())?;
 
-        let sim = y86_sim::framework::PipeSim::<y86_sim::architectures::pipe_full::Arch>::new(
-            a.obj.init_mem(),
-            false,
-        );
+        let sim = y86_sim::framework::PipeSim::<Arch>::new(a.obj.init_mem(), false);
         let source_path = program.clone();
         let source_info = a.source;
         let source_name = program.file_name().unwrap().to_string_lossy().to_string();
@@ -161,7 +160,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
             }
             Command::ConfigurationDone => Ok((
                 req.success(ResponseBody::ConfigurationDone),
-                ServerStatus::RunProg(RunProgKind::Run),
+                ServerStatus::RunProg(RunProgKind::InitialRun),
             )),
             Command::SetBreakpoints(args) => {
                 let Some(breakpoints) = &args.breakpoints else {
@@ -188,9 +187,6 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                         let message = ln.addr.map(|a| format!("addr: {:#x}", a));
 
                         let Some(addr) = ln.addr else {
-                            return types::Breakpoint::default();
-                        };
-                        let Some(_) = &ln.inst else {
                             return types::Breakpoint::default();
                         };
 
@@ -416,6 +412,21 @@ impl<R: Read, W: Write> DebugServer<R, W> {
     }
 
     fn run_prog(&mut self, kind: RunProgKind) -> anyhow::Result<()> {
+        if kind == RunProgKind::InitialRun {
+            self.server
+                .send_event(Event::Stopped(events::StoppedEventBody {
+                    reason: types::StoppedEventReason::Entry,
+                    description: Some(format!("Stop at beginning")),
+                    thread_id: Some(THREAD_ID),
+                    preserve_focus_hint: Some(false),
+                    text: None,
+                    all_threads_stopped: None,
+                    hit_breakpoint_ids: None,
+                }))?;
+            self.status = ServerStatus::ServeReq;
+            return Ok(());
+        }
+
         let inner = self
             .inner
             .as_mut()
