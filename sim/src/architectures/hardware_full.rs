@@ -10,6 +10,7 @@ use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
 use crate::isa::reg_code;
 use crate::isa::reg_code::*;
+use crate::utils::format_reg_val;
 use crate::{
     define_units,
     framework::MEM_SIZE,
@@ -266,31 +267,16 @@ impl HardwareUnits for Units {
 
 impl Units {
     pub(crate) fn print_reg(&self) -> String {
-        use binutils::clap::builder::styling::*;
-
-        fn fmt_val(val: u64) -> String {
-            let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
-            if val == 0 {
-                format!("{s}{:016x}{s:#}", 0)
-            } else {
-                let num = format!("{val:x}");
-                let prefix = std::iter::repeat('0')
-                    .take(16 - num.len())
-                    .collect::<String>();
-                format!("{s}{}{s:#}{}", prefix, num)
-            }
-        }
-
         format!(
             "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}",
-            rax = fmt_val(self.reg_file.state[RAX as usize]),
-            rbx = fmt_val(self.reg_file.state[RBX as usize]),
-            rcx = fmt_val(self.reg_file.state[RCX as usize]),
-            rdx = fmt_val(self.reg_file.state[RDX as usize]),
-            rsi = fmt_val(self.reg_file.state[RSI as usize]),
-            rdi = fmt_val(self.reg_file.state[RDI as usize]),
-            rsp = fmt_val(self.reg_file.state[RSP as usize]),
-            rbp = fmt_val(self.reg_file.state[RBP as usize]),
+            rax = format_reg_val(self.reg_file.state[RAX as usize]),
+            rbx = format_reg_val(self.reg_file.state[RBX as usize]),
+            rcx = format_reg_val(self.reg_file.state[RCX as usize]),
+            rdx = format_reg_val(self.reg_file.state[RDX as usize]),
+            rsi = format_reg_val(self.reg_file.state[RSI as usize]),
+            rdi = format_reg_val(self.reg_file.state[RDI as usize]),
+            rsp = format_reg_val(self.reg_file.state[RSP as usize]),
+            rbp = format_reg_val(self.reg_file.state[RBP as usize]),
         )
     }
 }

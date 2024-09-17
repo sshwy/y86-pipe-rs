@@ -117,3 +117,11 @@ impl<T: CpuArch> PipeSim<T> {
         self.units.registers()
     }
 }
+
+#[derive(Debug)]
+pub struct StageInfo {
+    /// name of the stage
+    pub name: &'static str,
+    /// (var name, formatted value)
+    pub signals: Vec<(String, String)>,
+}

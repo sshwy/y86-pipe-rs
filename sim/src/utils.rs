@@ -1,4 +1,5 @@
 use crate::framework::MEM_SIZE;
+use binutils::clap::builder::styling::*;
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {
@@ -54,5 +55,44 @@ pub fn mem_print(bin: &[u8; MEM_SIZE]) {
             print!("{:02x}", *byte)
         }
         println!()
+    }
+}
+
+pub fn format_ctrl(bubble: bool, stall: bool) -> String {
+    if bubble {
+        let s = Style::new()
+            .bold()
+            .fg_color(Some(Color::Ansi(AnsiColor::Red)));
+        format!("{s}Bubble{s:#}")
+    } else if stall {
+        let s = Style::new()
+            .bold()
+            .fg_color(Some(Color::Ansi(AnsiColor::Red)));
+        format!("{s}Stall {s:#}")
+    } else {
+        let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+        format!("{s}Normal{s:#}")
+    }
+}
+
+pub fn format_icode(name: &str) -> String {
+    if name == "NOP" {
+        let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Magenta)));
+        format!("{s}{name:6}{s:#}")
+    } else {
+        format!("{name:6}")
+    }
+}
+
+pub fn format_reg_val(val: u64) -> String {
+    let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
+    if val == 0 {
+        format!("{s}{:016x}{s:#}", 0)
+    } else {
+        let num = format!("{val:x}");
+        let prefix = std::iter::repeat('0')
+            .take(16 - num.len())
+            .collect::<String>();
+        format!("{s}{}{s:#}{}", prefix, num)
     }
 }

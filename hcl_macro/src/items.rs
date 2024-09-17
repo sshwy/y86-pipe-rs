@@ -2,6 +2,44 @@ use crate::expr;
 use expr::LValue;
 use syn::{parse::Parse, punctuated::Punctuated, Token};
 
+struct StageTitleBoundary;
+
+impl Parse for StageTitleBoundary {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let _ = input.parse::<Token![:]>()?;
+        // at least 1 `=`
+        let _ = input.parse::<Token![=]>()?;
+        while input.peek(Token![=]) {
+            let _ = input.parse::<Token![=]>()?;
+        }
+        let _ = input.parse::<Token![:]>()?;
+        Ok(Self)
+    }
+}
+
+/// `:======: title :=====:`
+pub struct StageDecl {
+    pub name: String,
+}
+
+impl Parse for StageDecl {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let _ = input.parse::<StageTitleBoundary>()?;
+        let mut name = Vec::new();
+        while !input.peek(Token![:]) || !input.peek2(Token![=]) {
+            let ident = input
+                .parse::<syn::Ident>()
+                .map(|id| id.to_string())
+                .unwrap_or_else(|_| input.parse::<syn::LitStr>().unwrap().value());
+            name.push(ident);
+        }
+        let _ = input.parse::<StageTitleBoundary>()?;
+        Ok(Self {
+            name: name.join(" "),
+        })
+    }
+}
+
 struct AtoB {
     a: syn::Ident,
     b: syn::Ident,
@@ -182,6 +220,7 @@ pub struct SignalDef {
     pub typ: syn::Type,
     pub source: SignalSource,
     pub destinations: Vec<SignalDest>,
+    pub stage_index: Option<usize>,
 }
 
 impl Parse for SignalDef {
@@ -211,6 +250,7 @@ impl Parse for SignalDef {
             typ,
             source,
             destinations,
+            stage_index: None,
         })
     }
 }

@@ -11,6 +11,7 @@ struct HclData {
     termination: LValue,
     /// (cur, pre)
     stage_alias: items::StageAlias,
+    stage_decls: Vec<items::StageDecl>,
     use_items: Vec<syn::ItemUse>,
     intermediate_signals: Vec<items::SignalDef>,
 }
@@ -87,6 +88,7 @@ impl Parse for HclData {
 
         let mut use_items = Vec::new();
         let mut intermediate_signals = Vec::new();
+        let mut stage_decls = Vec::new();
 
         // repeatly parse the rest of the input
         loop {
@@ -96,8 +98,14 @@ impl Parse for HclData {
             } else if lookahead.peek(Token![use]) {
                 let item = input.parse::<syn::ItemUse>()?;
                 use_items.push(item);
+            } else if lookahead.peek(Token![:]) {
+                let item = input.parse::<items::StageDecl>()?;
+                stage_decls.push(item);
             } else {
-                let item = input.parse::<items::SignalDef>()?;
+                let mut item = input.parse::<items::SignalDef>()?;
+                if !stage_decls.is_empty() {
+                    item.stage_index = Some(stage_decls.len() - 1);
+                }
                 intermediate_signals.push(item);
             }
         }
@@ -109,6 +117,7 @@ impl Parse for HclData {
             termination,
             use_items,
             intermediate_signals,
+            stage_decls,
         })
     }
 }
@@ -131,94 +140,6 @@ impl HclData {
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct IntermediateSignal {
                 #signal_fields
-            }
-        }
-    }
-    fn render_build_circuit(&self) -> proc_macro2::TokenStream {
-        let inter = &quote::format_ident!("c_");
-        let inter_names = self
-            .intermediate_signals
-            .iter()
-            .map(|s| &s.name)
-            .collect::<Vec<_>>();
-        let stage_alias = &self.stage_alias.0;
-
-        let mapper = |mut lv: LValue| -> LValue {
-            if inter_names.contains(&&lv.0[0]) {
-                lv.0.insert(0, inter.clone().into());
-            } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
-                lv.0[0] = cur.clone();
-                lv.0.insert(0, format_ident!("p_"));
-            } else if let Some((cur, _)) = stage_alias.iter().find(|(cur, _)| &lv.0[0] == cur) {
-                lv.0[0] = cur.clone();
-                lv.0.insert(0, format_ident!("n_"));
-            }
-            lv
-        };
-
-        let updaters_stmt = self
-            .intermediate_signals
-            .iter()
-            .map(|s| HclData::render_signal_updater(s, mapper))
-            .reduce(|a, b| quote! { #a #b })
-            .unwrap_or_default();
-
-        let stmts = self
-            .intermediate_signals
-            .iter()
-            .map(|signal| {
-                let name = &signal.name;
-                let update_deps = signal
-                    .source
-                    .lvalues()
-                    .into_iter()
-                    .map(mapper.clone())
-                    .collect::<Punctuated<LValue, Token![,]>>();
-
-                let update_stmts = quote! {
-                    g.add_update(stringify!(#name), stringify!(#update_deps));
-                };
-                let rev_deps_stmts = signal
-                    .destinations
-                    .iter()
-                    .map(move |dest| {
-                        let dest = &dest.dest;
-                        quote! {
-                            g.add_rev_deps(stringify!(#name), stringify!(#dest));
-                        }
-                    })
-                    .reduce(|a, b| quote! { #a #b })
-                    .unwrap_or_default();
-
-                quote! {
-                    #update_stmts
-                    #rev_deps_stmts
-                }
-            })
-            .reduce(|a, b| quote! { #a #b })
-            .unwrap_or_default();
-
-        quote! {
-            fn build_circuit() -> crate::framework::PropCircuit<Arch> {
-                use crate::framework::*;
-
-                // cur: o, nex: i
-                let order = {
-                    let mut g = PropOrderBuilder::new();
-                    // hardware setup
-                    hardware_setup(&mut g);
-                    #stmts
-                    g.build()
-                };
-
-                use crate::isa::inst_code::*;
-                use crate::isa::reg_code::*;
-                use crate::isa::op_code::*;
-                use binutils::clap::builder::styling::*;
-
-                let mut circuit = PropCircuit::new(order);
-                #updaters_stmt
-                circuit
             }
         }
     }
@@ -314,6 +235,94 @@ impl HclData {
             }
         }
     }
+    fn render_build_circuit(&self) -> proc_macro2::TokenStream {
+        let inter = &quote::format_ident!("c_");
+        let inter_names = self
+            .intermediate_signals
+            .iter()
+            .map(|s| &s.name)
+            .collect::<Vec<_>>();
+        let stage_alias = &self.stage_alias.0;
+
+        let mapper = |mut lv: LValue| -> LValue {
+            if inter_names.contains(&&lv.0[0]) {
+                lv.0.insert(0, inter.clone().into());
+            } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
+                lv.0[0] = cur.clone();
+                lv.0.insert(0, format_ident!("p_"));
+            } else if let Some((cur, _)) = stage_alias.iter().find(|(cur, _)| &lv.0[0] == cur) {
+                lv.0[0] = cur.clone();
+                lv.0.insert(0, format_ident!("n_"));
+            }
+            lv
+        };
+
+        let updaters_stmt = self
+            .intermediate_signals
+            .iter()
+            .map(|s| HclData::render_signal_updater(s, mapper))
+            .reduce(|a, b| quote! { #a #b })
+            .unwrap_or_default();
+
+        let stmts = self
+            .intermediate_signals
+            .iter()
+            .map(|signal| {
+                let name = &signal.name;
+                let update_deps = signal
+                    .source
+                    .lvalues()
+                    .into_iter()
+                    .map(mapper.clone())
+                    .collect::<Punctuated<LValue, Token![,]>>();
+
+                let update_stmts = quote! {
+                    g.add_update(stringify!(#name), stringify!(#update_deps));
+                };
+                let rev_deps_stmts = signal
+                    .destinations
+                    .iter()
+                    .map(move |dest| {
+                        let dest = &dest.dest;
+                        quote! {
+                            g.add_rev_deps(stringify!(#name), stringify!(#dest));
+                        }
+                    })
+                    .reduce(|a, b| quote! { #a #b })
+                    .unwrap_or_default();
+
+                quote! {
+                    #update_stmts
+                    #rev_deps_stmts
+                }
+            })
+            .reduce(|a, b| quote! { #a #b })
+            .unwrap_or_default();
+
+        quote! {
+            fn build_circuit() -> crate::framework::PropCircuit<Arch> {
+                use crate::framework::*;
+
+                // cur: o, nex: i
+                let order = {
+                    let mut g = PropOrderBuilder::new();
+                    // hardware setup
+                    hardware_setup(&mut g);
+                    #stmts
+                    g.build()
+                };
+
+                use crate::isa::inst_code::*;
+                use crate::isa::reg_code::*;
+                use crate::isa::op_code::*;
+                use binutils::clap::builder::styling::*;
+
+                let mut circuit = PropCircuit::new(order);
+                #updaters_stmt
+                circuit
+            }
+        }
+    }
     fn render_update(&self) -> proc_macro2::TokenStream {
         quote! {
             /// Simulate one cycle of the CPU, update the input and output signals
@@ -345,6 +354,56 @@ impl HclData {
             }
         }
     }
+    fn render_get_stage_info(&self) -> proc_macro2::TokenStream {
+        let mut stage_items = self
+            .stage_decls
+            .iter()
+            .map(|stage| {
+                let name = &stage.name;
+                quote! {
+                    crate::framework::StageInfo {
+                        name: #name,
+                        signals: vec![],
+                    }
+                }
+            })
+            .reduce(|a, b| quote! { #a, #b })
+            .unwrap_or_default();
+        if stage_items.is_empty() {
+            stage_items = quote! {
+                crate::framework::StageInfo {
+                    name: "(default)",
+                    signals: vec![],
+                }
+            };
+        }
+        let sig_stmts = self
+            .intermediate_signals
+            .iter()
+            .map(|sig| {
+                let stage_index = sig.stage_index.unwrap_or(0);
+                let name = &sig.name;
+
+                quote! {
+                    info[#stage_index].signals.push((
+                        stringify!(#name).to_string(),
+                        format!("{:#x?}", self.cur_inter.#name)
+                    ));
+                }
+            })
+            .reduce(|a, b| quote! { #a #b })
+            .unwrap_or_default();
+
+        quote! {
+            #[allow(unused)]
+            #[allow(non_snake_case)]
+            pub fn get_stage_info(&self) -> Vec<crate::framework::StageInfo> {
+                let mut info = vec![#stage_items];
+                #sig_stmts
+                info
+            }
+        }
+    }
     fn render(&self) -> proc_macro2::TokenStream {
         let hardware = &self.hardware;
         let use_stmts = self
@@ -357,6 +416,7 @@ impl HclData {
         let intermediate_signal_struct = self.render_intermediate_signal_struct();
         let build_circuit_fn = self.render_build_circuit();
         let update_fn = self.render_update();
+        let get_stage_info_fn = self.render_get_stage_info();
         let pc_name = &self.program_counter;
         let termination = &self.termination;
 
@@ -383,10 +443,13 @@ impl HclData {
 
             impl crate::framework::PipeSim<Arch> {
                 #update_fn
+                #get_stage_info_fn
                 pub fn step(&mut self) {
                     use crate::framework::CpuSim;
                     tracing::info!("{:=^74}", " Run Cycle ");
                     self.propagate_signals();
+
+                    tracing::debug!("{:?}", self.get_stage_info());
 
                     if self.tty_out {
                         self.print_state();
