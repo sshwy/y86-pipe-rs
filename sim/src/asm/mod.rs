@@ -1,5 +1,5 @@
 //! This module provides parsing utilities for the y86 assembly.
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use pest::Parser;
 use pest_derive::Parser;
@@ -408,8 +408,17 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     if tok2.as_str().starts_with(".quad") {
                         src_info.data = Some((8, imm));
                         cur_addr += 8;
+                    } else if tok2.as_str().starts_with(".long") {
+                        src_info.data = Some((4, imm));
+                        cur_addr += 4;
+                    } else if tok2.as_str().starts_with(".word") {
+                        src_info.data = Some((2, imm));
+                        cur_addr += 2;
+                    } else if tok2.as_str().starts_with(".byte") {
+                        src_info.data = Some((1, imm));
+                        cur_addr += 1;
                     } else {
-                        todo!()
+                        bail!("invalid data directive: {}", tok2.as_str())
                     }
                 }
                 Rule::d_align => {

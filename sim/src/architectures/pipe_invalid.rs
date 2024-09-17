@@ -1,6 +1,4 @@
-use hcl_macro::hcl;
-
-hcl! {
+hcl_macro::hcl! {
 #![hardware = crate::architectures::hardware_full]
 #![program_counter = a]
 #![termination = term]
@@ -21,7 +19,6 @@ impl crate::framework::PipeSim<Arch> {
 #[cfg(test)]
 mod tests {
     use crate::framework::CpuArch;
-
     use super::Arch;
 
     #[test]
