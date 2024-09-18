@@ -1,4 +1,4 @@
-//! This module defines hardware units used in the classic RISC-V pipeline.
+//! This module defines hardware units used in the classic RISC-V seq.
 //! The units are defined using the `define_units!` macro.
 
 use std::cell::RefCell;
@@ -6,7 +6,6 @@ use std::rc::Rc;
 
 use crate::framework::HardwareUnits;
 use crate::isa::cond_fn::*;
-use crate::isa::inst_code::NOP;
 use crate::isa::op_code::*;
 use crate::isa::reg_code;
 use crate::isa::reg_code::*;
@@ -23,9 +22,6 @@ use crate::{
 pub enum Stat {
     /// Indicates that everything is fine.
     Aok = 0,
-    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP instruction.
-    /// Initially, all stages are in the bubble state.
-    Bub = 1,
     /// The halt state. This state is assigned when the instruction fetcher reads
     /// the halt instruction. (If your architecture lacks a instruction fetcher,
     /// there should be some other way to specify the halt state in HCL.)
@@ -45,37 +41,18 @@ impl Default for Stat {
 }
 
 define_units! {
-    // stage registers and default values for bubble status
+    // stage registers and default values
     PipeRegs {
-        /// Fetch stage registers.
-        /// note that it's not possible to bubble (see hcl)
-        Fstage f {
-            pred_pc: u64 = 0
-        }
-        Dstage d {
-            stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
-            ra: u8 = RNONE, rb: u8 = RNONE, valc: u64 = 0, valp: u64 = 0
-        }
-        Estage e {
-            stat: Stat = Stat::Bub, icode: u8 = NOP, ifun: u8 = 0,
-            vala: u64 = 0, valb: u64 = 0, valc: u64 = 0, dste: u8 = RNONE,
-            dstm: u8 = RNONE, srca: u8 = RNONE, srcb: u8 = RNONE
-        }
-        /// Memory Access Stage
-        Mstage m {
-            stat: Stat = Stat::Bub, icode: u8 = NOP, cnd: bool = false,
-            vale: u64 = 0, vala: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE
-        }
-        Wstage w {
-            stat: Stat = Stat::Bub, icode: u8 = NOP, vale: u64 = 0,
-            valm: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE
-        }
-
+        /// The whole cycle is a single stage.
+        SEQstage s { pc: u64 = 0 }
     }
 
     FunctionalUnits {
         InstructionMemory imem { // with split
-            .input(pc: u64)
+            .input(
+                /// The input pc is used to read the instruction from memory.
+                pc: u64
+            )
             .output(
                 /// This signal is set to true if the address is invalid.
                 /// (i.e. the address is out of the memory range)
@@ -125,20 +102,23 @@ define_units! {
             *new_pc = x;
         }
 
-        /// The register file perform two tasks:
-        /// 
-        /// 1. Read the values of the source registers `srca` and `srcb`.
-        /// 2. Write the value of the destination register `dste` and `dstm`.
-        /// 
-        /// If the register is `RNONE`, the corresponding operation is not performed.
-        RegisterFile reg_file {
-            .input(srca: u8, srcb: u8, dste: u8, dstm: u8, vale: u64, valm: u64)
+        RegisterFileRead reg_read {
+            .input(srca: u8, srcb: u8)
             .output(vala: u64, valb: u64)
-            state: [u64; 16]
+            state: Rc<RefCell<[u64; 16]>>
         } {
             // if RNONE, set to 0 for better debugging
+            let state  = &mut state.borrow_mut();
             *vala = if srca != RNONE { state[srca as usize] } else { 0 };
             *valb = if srcb != RNONE { state[srcb as usize] } else { 0 };
+        }
+
+        RegisterFileWrite reg_write {
+            .input(dste: u8, dstm: u8, vale: u64, valm: u64)
+            .output()
+            state: Rc<RefCell<[u64; 16]>>
+        } {
+            let state  = &mut state.borrow_mut();
             if dste != RNONE {
                 tracing::info!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
                 state[dste as usize] = vale;
@@ -238,13 +218,15 @@ impl HardwareUnits for Units {
     /// Init CPU harewre with given memory.
     fn init(memory: [u8; MEM_SIZE]) -> Self {
         let cell = std::rc::Rc::new(RefCell::new(memory));
+        let reg = Rc::new(RefCell::new([0; 16]));
         Self {
             imem: InstructionMemory {
                 binary: cell.clone(),
             },
             ialign: Align {},
             pc_inc: PCIncrement {},
-            reg_file: RegisterFile { state: [0; 16] },
+            reg_read: RegisterFileRead { state: reg.clone() },
+            reg_write: RegisterFileWrite { state: reg.clone() },
             alu: ArithmetcLogicUnit {},
             cc: ConditionCode {
                 s_sf: false,
@@ -261,8 +243,9 @@ impl HardwareUnits for Units {
     }
 
     fn registers(&self) -> Vec<(u8, u64)> {
-        self.reg_file
+        self.reg_read
             .state
+            .borrow()
             .iter()
             .enumerate()
             .filter(|(id, _)| (*id as u8) != RNONE)
@@ -273,16 +256,17 @@ impl HardwareUnits for Units {
 
 impl Units {
     pub(crate) fn print_reg(&self) -> String {
+        let reg_file = self.reg_read.state.borrow();
         format!(
             "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}",
-            rax = format_reg_val(self.reg_file.state[RAX as usize]),
-            rbx = format_reg_val(self.reg_file.state[RBX as usize]),
-            rcx = format_reg_val(self.reg_file.state[RCX as usize]),
-            rdx = format_reg_val(self.reg_file.state[RDX as usize]),
-            rsi = format_reg_val(self.reg_file.state[RSI as usize]),
-            rdi = format_reg_val(self.reg_file.state[RDI as usize]),
-            rsp = format_reg_val(self.reg_file.state[RSP as usize]),
-            rbp = format_reg_val(self.reg_file.state[RBP as usize]),
+            rax = format_reg_val(reg_file[RAX as usize]),
+            rbx = format_reg_val(reg_file[RBX as usize]),
+            rcx = format_reg_val(reg_file[RCX as usize]),
+            rdx = format_reg_val(reg_file[RDX as usize]),
+            rsi = format_reg_val(reg_file[RSI as usize]),
+            rdi = format_reg_val(reg_file[RDI as usize]),
+            rsp = format_reg_val(reg_file[RSP as usize]),
+            rbp = format_reg_val(reg_file[RBP as usize]),
         )
     }
 }

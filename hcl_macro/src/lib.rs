@@ -495,6 +495,13 @@ impl HclData {
                     tracing::debug!("{:?}", self.get_stage_info());
 
                     if self.tty_out {
+                        use binutils::clap::builder::styling::*;
+                        let title_style = Style::new().bold();
+                        println!(
+                            "{title_style}{summary:=^80}{title_style:#}",
+                            summary = format!(" [Cycle {}, pc={:#x}] ", self.cycle_count, self.program_counter()),
+                        );
+
                         self.print_state();
                     }
 

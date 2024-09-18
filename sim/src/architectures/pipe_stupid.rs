@@ -5,8 +5,6 @@
 //! a special stupid "instruction memory" for it. To handle pc increment, we
 //! ship an ALU with it.
 
-use crate::framework::CpuSim;
-
 hcl_macro::hcl! {
 
 #![hardware = crate::architectures::hardware_stupid]
@@ -40,11 +38,6 @@ bool term = icode == 0;
 
 impl crate::framework::PipeSim<Arch> {
     fn print_state(&self) {
-        println!(
-            "cycle: {}  pc: {:x}  icode {}",
-            self.cycle_count(),
-            self.program_counter(),
-            self.cur_inter.icode,
-        );
+        println!("icode = {}", self.cur_inter.icode,);
     }
 }

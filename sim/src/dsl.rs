@@ -61,6 +61,7 @@ macro_rules! define_units {
             use super::*;
             $(#[derive(Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+            $(#[$stage_att])*
             pub struct $pr_name {
                 $(pub $pname: $ptype, )*
                 /// A special input of the pipeline register. If `bubble` is true,
