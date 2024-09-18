@@ -21,9 +21,9 @@ Hope you enjoy.
 
 Note: the behavior of `cargo-expand` is incorrect.
 
-todo: check two device cannot have the same name.
 todo: test sim!!!
 todo: cargo vendor
 todo: test NOP (NOP should not change any hardware states)
 todo: write a seq pipeline for inst_count
+todo: arch switch
 to test: RUST_MIN_STACK=104857600 cargo test

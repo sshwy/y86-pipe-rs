@@ -18,8 +18,8 @@ impl crate::framework::PipeSim<Arch> {
 
 #[cfg(test)]
 mod tests {
-    use crate::framework::CpuArch;
     use super::Arch;
+    use crate::framework::CpuArch;
 
     #[test]
     #[should_panic]

@@ -10,7 +10,7 @@ use crate::framework::CpuSim;
 hcl_macro::hcl! {
 
 #![hardware = crate::architectures::hardware_stupid]
-#![program_counter = f_pc]
+#![program_counter = pc]
 #![termination = term]
 
 // Although this is a very stupid pipeline, we still have a pipeline register.
@@ -19,20 +19,19 @@ hcl_macro::hcl! {
 
 // The `pc` stored in F are used as the index of current byte. We pass it
 // to the instruction memory.
-// todo: fix pc name!
-u64 f_pc = F.pc -> i.imem.pc;
+u64 pc = F.pc -> imem.pc;
 
 // We get the instruction code (the higher 4 bits expanded unsignedly to 8 bits).
-u8 icode = o.imem.higher;
+u8 icode = imem.higher;
 
 // Note that we can not simply write `u64 next_pc = F.pc + 1` to get the next
 // pc. We have to use ALU to do the addition.
-u64 alua = F.pc -> i.alu.a;
-u64 alub = 1 -> i.alu.b;
-u8 alufun = ADD -> i.alu.fun;
+u64 alua = F.pc -> alu.a;
+u64 alub = 1 -> alu.b;
+u8 alufun = ADD -> alu.fun;
 
 // We get the next pc and pass it to the next stage.
-u64 next_pc = o.alu.e -> f.pc;
+u64 next_pc = alu.e -> f.pc;
 
 // If the instruction code is 0, we halt.
 bool term = icode == 0;

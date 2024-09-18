@@ -174,6 +174,8 @@ impl SignalSource {
 pub struct SignalDest {
     pub tunnel: Option<syn::Ident>,
     pub dest: LValue,
+    /// this destination is stage field or device input
+    pub is_stage_field: bool,
 }
 
 impl Parse for SignalDest {
@@ -190,7 +192,11 @@ impl Parse for SignalDest {
             }
         });
 
-        Ok(Self { tunnel, dest })
+        Ok(Self {
+            tunnel,
+            dest,
+            is_stage_field: false,
+        })
     }
 }
 

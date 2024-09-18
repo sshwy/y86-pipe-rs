@@ -106,6 +106,11 @@ impl Parse for HclData {
                 if !stage_decls.is_empty() {
                     item.stage_index = Some(stage_decls.len() - 1);
                 }
+                item.destinations.iter_mut().for_each(|dest| {
+                    if stage_alias.0.iter().any(|(cur, _)| cur == &dest.dest.0[0]) {
+                        dest.is_stage_field = true;
+                    }
+                });
                 intermediate_signals.push(item);
             }
         }
@@ -145,7 +150,8 @@ impl HclData {
     }
     fn render_signal_updater(
         signal: &SignalDef,
-        mapper: impl Fn(LValue) -> LValue + Clone,
+        expr_mapper: impl Fn(LValue) -> LValue + Clone,
+        lval_mapper: impl Fn(LValue) -> LValue + Clone,
     ) -> proc_macro2::TokenStream {
         let name = &signal.name;
 
@@ -154,8 +160,8 @@ impl HclData {
                 let case_stmts = cases
                     .iter()
                     .map(|case| {
-                        let cond = case.condition.clone().map(mapper.clone());
-                        let val = case.value.clone().map(mapper.clone());
+                        let cond = case.condition.clone().map(expr_mapper.clone());
+                        let val = case.value.clone().map(expr_mapper.clone());
                         let tunnel_stmts = case.tunnel.as_ref().cloned().map(|tunnel| {
                             quote! {
                                 has_tunnel_input = true;
@@ -179,7 +185,7 @@ impl HclData {
                 }
             }
             items::SignalSource::Expr(SignalSourceExpr { tunnel, expr }) => {
-                let expr = expr.clone().map(mapper.clone());
+                let expr = expr.clone().map(expr_mapper.clone());
                 let tunnel_stmts = tunnel.as_ref().cloned().map(|tunnel| {
                     quote! {
                         has_tunnel_input = true;
@@ -199,19 +205,25 @@ impl HclData {
             .destinations
             .iter()
             .map(|dest| {
-                let dst = dest.dest.clone().map(mapper.clone());
-                if let Some(tunnel) = dest.tunnel.as_ref() {
+                let dst = dest.dest.clone().map(lval_mapper.clone());
+
+                let tunner_stmt = dest.tunnel.as_ref().map(|tunnel| {
                     quote! {
-                        #dst = c_.#name.to_owned();
                         if has_tunnel_input {
                             tracing::debug!("tunnel triggered: {}", stringify!(#tunnel));
                             tracer.trigger_tunnel(stringify!(#tunnel));
                         }
                     }
+                });
+
+                let dst_name = if dest.is_stage_field {
+                    quote! { #dst }
                 } else {
-                    quote! {
-                        #dst = c_.#name.to_owned();
-                    }
+                    quote! { i_.#dst }
+                };
+                quote! {
+                    #dst_name = c_.#name.to_owned();
+                    #tunner_stmt
                 }
             })
             .reduce(|a, b| quote! { #a #b })
@@ -220,11 +232,11 @@ impl HclData {
         quote! {
             {
                 fn updater(
-                    i: &mut UnitInputSignal,
+                    i_: &mut UnitInputSignal,
                     c_: &mut IntermediateSignal,
                     n_: &mut PipeRegs,
                     tracer: &mut Tracer,
-                    o: &UnitOutputSignal,
+                    o_: &UnitOutputSignal,
                     p_: &PipeRegs,
                 ) {
                     let mut has_tunnel_input = false;
@@ -244,12 +256,21 @@ impl HclData {
             .collect::<Vec<_>>();
         let stage_alias = &self.stage_alias.0;
 
-        let mapper = |mut lv: LValue| -> LValue {
+        let expr_mapper = |mut lv: LValue| -> LValue {
             if inter_names.contains(&&lv.0[0]) {
                 lv.0.insert(0, inter.clone());
             } else if let Some((cur, _)) = stage_alias.iter().find(|(_, pre)| &lv.0[0] == pre) {
                 lv.0[0] = cur.clone();
                 lv.0.insert(0, format_ident!("p_"));
+            } else if lv.0.len() > 1 {
+                lv.0.insert(0, format_ident!("o_"));
+            }
+            lv
+        };
+
+        let lval_mapper = |mut lv: LValue| -> LValue {
+            if inter_names.contains(&&lv.0[0]) {
+                lv.0.insert(0, inter.clone());
             } else if let Some((cur, _)) = stage_alias.iter().find(|(cur, _)| &lv.0[0] == cur) {
                 lv.0[0] = cur.clone();
                 lv.0.insert(0, format_ident!("n_"));
@@ -260,44 +281,66 @@ impl HclData {
         let updaters_stmt = self
             .intermediate_signals
             .iter()
-            .map(|s| HclData::render_signal_updater(s, mapper))
+            .map(|s| HclData::render_signal_updater(s, expr_mapper, lval_mapper))
             .reduce(|a, b| quote! { #a #b })
             .unwrap_or_default();
 
-        let stmts = self
-            .intermediate_signals
-            .iter()
-            .map(|signal| {
-                let name = &signal.name;
-                let update_deps = signal
+        let stmts =
+            self.intermediate_signals
+                .iter()
+                .map(|signal| {
+                    let name = &signal.name;
+                    let update_stmts = signal
                     .source
                     .lvalues()
                     .into_iter()
-                    .map(mapper)
-                    .collect::<Punctuated<LValue, Token![,]>>();
-
-                let update_stmts = quote! {
-                    g.add_update(stringify!(#name), stringify!(#update_deps));
-                };
-                let rev_deps_stmts = signal
-                    .destinations
-                    .iter()
-                    .map(move |dest| {
-                        let dest = &dest.dest;
-                        quote! {
-                            g.add_rev_deps(stringify!(#name), stringify!(#dest));
-                        }
+                    .filter(|lv| {
+                        // is intermediate signal or unit port
+                        // previous stage fields are not included
+                        lv.0.len() == 1 && inter_names.iter().any(|n| &lv.0[0] == *n)
+                            || lv.0.len() == 2 && stage_alias.iter().all(|(_, pre)| &lv.0[0] != pre)
                     })
-                    .reduce(|a, b| quote! { #a #b })
-                    .unwrap_or_default();
+                    .map(|lv| quote! {
+                        g.add_edge(stringify!(#lv).to_string(), stringify!(#name).to_string());
+                    })
+                    .reduce(|a, b| quote! { #a #b }).unwrap_or_default();
+                    // .collect::<Punctuated<LValue, Token![,]>>();
 
-                quote! {
-                    #update_stmts
-                    #rev_deps_stmts
-                }
-            })
-            .reduce(|a, b| quote! { #a #b })
-            .unwrap_or_default();
+                    let update_stmts = quote! {
+                        #update_stmts
+                        g.add_intermediate(stringify!(#name));
+                    };
+                    let rev_deps_stmts = signal
+                        .destinations
+                        .iter()
+                        .map(move |dest| {
+                            // the dest is either a stage name or input of a device
+                            let dest_name = &dest.dest;
+
+                            if dest.is_stage_field {
+                                // dest is a stage output
+                                // no edge is needed
+                                quote! {}
+                            } else {
+                                // dest is a device input
+                                quote! {
+                                    g.add_edge(
+                                        stringify!(#name).to_string(),
+                                        stringify!(#dest_name).to_string()
+                                    );
+                                }
+                            }
+                        })
+                        .reduce(|a, b| quote! { #a #b })
+                        .unwrap_or_default();
+
+                    quote! {
+                        #update_stmts
+                        #rev_deps_stmts
+                    }
+                })
+                .reduce(|a, b| quote! { #a #b })
+                .unwrap_or_default();
 
         quote! {
             fn build_circuit() -> crate::framework::PropCircuit<Arch> {

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::Debug,
     hash::Hash,
 };
@@ -55,13 +55,12 @@ pub fn topo<Node: Copy + Eq + Hash + Debug>(
     levels
 }
 pub struct PropOrderBuilder {
+    runnable_nodes_set: HashSet<String>,
+    /// Runnable nodes includes units and intermediate signals.
     runnable_nodes: NameList,
     unit_nodes: Vec<String>,
-    nodes: BTreeSet<String>,
+    nodes: HashSet<String>,
     edges: Vec<(String, String)>,
-    /// (name, body)
-    deps: Vec<(String, String)>,
-    rev_deps: Vec<(String, String)>,
 }
 
 impl Default for PropOrderBuilder {
@@ -73,25 +72,23 @@ impl Default for PropOrderBuilder {
 impl PropOrderBuilder {
     pub fn new() -> Self {
         Self {
+            runnable_nodes_set: Default::default(),
             nodes: Default::default(),
             runnable_nodes: Default::default(),
             unit_nodes: Default::default(),
-            deps: Default::default(),
-            rev_deps: Default::default(),
             edges: Default::default(),
         }
     }
-    fn add_edge(&mut self, from: String, to: String) {
+    pub fn add_edge(&mut self, from: String, to: String) {
         self.nodes.insert(from.clone());
         self.nodes.insert(to.clone());
-        self.edges.push((from, to));
-    }
-    /// Unit `name` is the dependency of units exists in `body`.
-    pub fn add_rev_deps(&mut self, name: &'static str, body: &'static str) {
-        self.rev_deps.push((name.to_string(), body.to_string()))
+        self.edges.push((from.clone(), to.clone()));
     }
     /// Set unit `name` as runnable
     pub fn add_unit_node(&mut self, unit_name: &'static str) {
+        if !self.runnable_nodes_set.insert(unit_name.to_string()) {
+            panic!("duplicate unit name: {}", unit_name)
+        }
         self.runnable_nodes.push((true, unit_name));
         self.unit_nodes.push(unit_name.to_string());
     }
@@ -103,35 +100,22 @@ impl PropOrderBuilder {
         let full_name = String::from(unit_name) + "." + field_name;
         self.add_edge(unit_name.to_string(), full_name.to_string());
     }
-    pub fn add_update(&mut self, name: &'static str, body: &'static str) {
+    pub fn add_intermediate(&mut self, name: &'static str) {
+        if !self.runnable_nodes_set.insert(name.to_string()) {
+            panic!("duplicate intermediate name: {}", name)
+        }
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
-        self.deps.push((name.to_string(), body.to_string()));
     }
     fn init_deps(&mut self) {
-        // (from, to)
-        let mut new_edges = Vec::new();
-        for (name, body) in &self.deps {
-            for node in &self.nodes {
-                // edges from device to there inputs/outputs has already bean added
-                // thus is filtered out
-                if node != name && body.contains(node) && !self.unit_nodes.contains(node) {
-                    new_edges.push((node.to_string(), name.to_string()));
-                }
-            }
-        }
-        for (name, body) in &self.rev_deps {
-            for node in &self.nodes {
-                // edges from device to there inputs/outputs has already bean added
-                // thus is filtered out
-                if node != name && body.contains(node) && !self.unit_nodes.contains(node) {
-                    new_edges.push((name.to_string(), node.to_string()));
-                }
-            }
-        }
-        for (from, to) in new_edges {
-            self.add_edge(from, to)
-        }
+        // remove duplicates
+        self.edges = std::mem::take(&mut self.edges)
+            .into_iter()
+            .collect::<HashSet<(String, String)>>()
+            .into_iter()
+            .collect::<Vec<(String, String)>>();
+
+        self.edges.sort();
     }
     /// Compute topological order of nodes.
     pub fn build(mut self) -> PropOrder {
@@ -174,7 +158,7 @@ pub type Updater<T> = Box<
 >;
 
 pub struct PropUpdates<T: CpuCircuit> {
-    pub(crate) updates: BTreeMap<&'static str, Updater<T>>,
+    pub(crate) updates: HashMap<&'static str, Updater<T>>,
 }
 
 impl<T: CpuCircuit> PropUpdates<T> {
