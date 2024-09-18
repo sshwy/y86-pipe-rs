@@ -6,7 +6,7 @@ pub fn parse_literal(s: &str) -> Option<u64> {
     if let Ok(r) = s.parse() {
         return Some(r);
     }
-    if let Ok(r) = u64::from_str_radix("0x", 16) {
+    if let Ok(r) = u64::from_str_radix(s.strip_prefix("0x")?, 16) {
         return Some(r);
     }
     None
