@@ -2,4 +2,4 @@
 
 // do not modify the following line, as it automatically includes all extra
 // pipeline modules in current directory.
-hcl_macro::extra_pipelines!();
+sim_macro::extra_pipelines!();

@@ -2,3 +2,4 @@
 /vendor
 /*.ys
 *.yo
+.DS_Store

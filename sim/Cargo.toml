@@ -16,7 +16,7 @@ path = "src/main.rs"
 pest = "2.7"
 pest_derive = "2.7"
 regex = "1.10"
-hcl_macro = { path = "../hcl_macro" }
+sim_macro = { path = "../sim_macro" }
 interpolator = "0.5.0"
 binutils = { path = "../binutils" }
 tracing.workspace = true

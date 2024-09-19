@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "binutils", "hcl_macro", "sim", "debugger" ]
+members = [ "binutils", "sim_macro", "sim", "debugger" ]
 
 [workspace.package]
 repository = "https://github.com/sshwy/y86-pipe-rs"

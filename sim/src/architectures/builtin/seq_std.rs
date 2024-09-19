@@ -1,6 +1,6 @@
 const NEG_8: u64 = -8i64 as u64;
 
-hcl_macro::hcl! {
+sim_macro::hcl! {
 #![hardware = crate::architectures::hardware_seq]
 #![program_counter = pc]
 #![termination = prog_term]

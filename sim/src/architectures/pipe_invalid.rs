@@ -1,4 +1,4 @@
-hcl_macro::hcl! {
+sim_macro::hcl! {
 #![hardware = crate::architectures::hardware_full]
 #![program_counter = a]
 #![termination = term]

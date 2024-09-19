@@ -5,7 +5,7 @@
 //! a special stupid "instruction memory" for it. To handle pc increment, we
 //! ship an ALU with it.
 
-hcl_macro::hcl! {
+sim_macro::hcl! {
 
 #![hardware = crate::architectures::hardware_stupid]
 #![program_counter = pc]
