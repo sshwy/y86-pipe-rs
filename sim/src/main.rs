@@ -63,23 +63,17 @@ struct Args {
     #[arg(long)]
     run: bool,
 
-    // / Print logs during simulation
+    /// Print logs during simulation
     #[command(flatten)]
     verbose: verbose::Verbosity,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let content = std::fs::read_to_string(&args.input)
-        .with_context(|| format!("could not read file `{}`", &args.input))?;
-
     let verbose_asm = args
         .verbose
         .log_level()
         .is_some_and(|lv| lv >= verbose::Level::Trace);
-
-    let obj = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
-
     let log_level = match args.verbose.log_level() {
         Some(verbose::Level::Error) => &tracing::Level::WARN,
         Some(verbose::Level::Warn) => &tracing::Level::INFO,
@@ -89,6 +83,11 @@ fn main() -> Result<()> {
         None => &tracing::Level::ERROR,
     };
     binutils::logging_setup(log_level, None::<&std::fs::File>);
+
+    let content = std::fs::read_to_string(&args.input)
+        .with_context(|| format!("could not read file `{}`", &args.input))?;
+
+    let obj = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
 
     if args.run {
         if args.output.is_some() {

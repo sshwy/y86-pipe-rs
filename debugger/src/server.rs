@@ -1,12 +1,15 @@
-use anyhow::{bail, ensure};
-use dap::prelude::*;
-use serde::Deserialize;
 use std::{
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
 };
-use y86_sim::framework::CpuSim;
-use y86_sim::{architectures::create_sim, framework::MemData};
+
+use anyhow::{bail, ensure};
+use dap::prelude::*;
+use serde::Deserialize;
+use y86_sim::{
+    architectures::create_sim,
+    framework::{CpuSim, MemData},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunProgKind {
@@ -18,7 +21,8 @@ enum RunProgKind {
 enum ServerStatus {
     /// The server is running the program so it does not accept any request.
     RunProg(RunProgKind),
-    /// The program execution is stopped and the server is waiting for client request.
+    /// The program execution is stopped and the server is waiting for client
+    /// request.
     ServeReq,
 }
 
@@ -38,6 +42,7 @@ pub struct DebugServer<R: Read, W: Write> {
     /// Path of the source file (this debugger only supports single source file)
     server: dap::server::Server<R, W>,
     status: ServerStatus,
+    arch: String,
 }
 
 const THREAD_ID: i64 = 1;
@@ -57,12 +62,13 @@ struct LaunchOption {
 }
 
 impl<R: Read, W: Write> DebugServer<R, W> {
-    pub fn new(input: R, output: W) -> Self {
+    pub fn new(input: R, output: W, arch: String) -> Self {
         Self {
             inner: None,
             server: dap::server::Server::new(BufReader::new(input), BufWriter::new(output)),
             breakpoints: Vec::new(),
             status: ServerStatus::ServeReq,
+            arch,
         }
     }
 
@@ -79,7 +85,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         let a = y86_sim::assemble(&src, y86_sim::AssembleOption::default())?;
 
         let mem = MemData::init(a.obj.init_mem());
-        let sim = create_sim("pipe_full".into(), mem, false);
+        let sim = create_sim(self.arch.clone(), mem, false);
         let source_path = program.clone();
         let source_info = a.source;
         let source_name = program.file_name().unwrap().to_string_lossy().to_string();
@@ -373,7 +379,8 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         }));
 
         // When you call respond, send_event etc. the message will be wrapped
-        // in a base message with a appropriate seq number, so you don't have to keep track of that yourself
+        // in a base message with a appropriate seq number, so you don't have to keep
+        // track of that yourself
         self.server.respond(rsp)?;
 
         self.server.send_event(Event::Initialized)?;
