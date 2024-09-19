@@ -80,7 +80,7 @@ u64 alua = [
     icode in { CALL, PUSHQ } => NEG_8;
     icode in { RET, POPQ } => 8;
     // Other instructions don't need ALU
-] -> (alu.a, cc.a);
+] -> (alu.a, reg_cc.a);
 
 // Select input B to ALU
 u64 alub = [
@@ -88,22 +88,20 @@ u64 alub = [
               PUSHQ, RET, POPQ } => reg_read.valb;
     icode in { CMOVX, IRMOVQ } => 0;
     // Other instructions don't need ALU
-] -> (alu.b, cc.b);
+] -> (alu.b, reg_cc.b);
 
 // Set the ALU function
 u8 alufun = [
     icode == OPQ => ifun;
     1 => ADD;
-] -> (alu.fun, cc.opfun);
+] -> (alu.fun, reg_cc.opfun);
 
 // Should the condition codes be updated?
-bool set_cc = icode in { OPQ } -> cc.set_cc;
+bool set_cc = icode in { OPQ } -> reg_cc.set_cc;
 
-u64 vale = alu.e -> (cc.e, reg_write.vale);
+u64 vale = alu.e -> (reg_cc.e, reg_write.vale);
 
-bool cc_sf = cc.sf -> cond.sf;
-bool cc_of = cc.of -> cond.of;
-bool cc_zf = cc.zf -> cond.zf;
+ConditionCode cc = reg_cc.cc -> cond.cc;
 u8 cond_fun = ifun -> cond.condfun;
 bool cnd = cond.cnd;
 

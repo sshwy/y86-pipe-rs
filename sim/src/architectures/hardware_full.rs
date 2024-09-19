@@ -42,6 +42,15 @@ impl Default for Stat {
     }
 }
 
+/// A data structure that simulates the condition codes.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct ConditionCode {
+    sf: bool,
+    of: bool,
+    zf: bool,
+}
+
 define_units! {
     // stage registers and default values for bubble status
     PipeRegs {
@@ -160,37 +169,38 @@ define_units! {
             };
         }
 
-        ConditionCode cc {
+        /// Given the input and output of the ALU, this unit calculate the
+        /// condition codes and update the cc register if required.
+        RegisterCC reg_cc {
             .input(set_cc: bool, a: u64, b: u64, e: u64, opfun: u8)
-            .output(sf: bool, of: bool, zf: bool)
-            s_sf: bool,
-            s_of: bool,
-            s_zf: bool,
+            .output(cc: ConditionCode)
+            inner_cc: ConditionCode
         } {
-            let cur_sf = (e >> 31 & 1) != 0;
-            let cur_zf = e == 0;
-            let cur_of = match opfun {
-                // a, b have the same sign and a, e have different sign
-                ADD => (!(a ^ b) & (a ^ e)) >> 31 != 0,
-                // (b - a): a, b have different sign and b, e have different sign
-                SUB => ((a ^ b) & (b ^ e)) >> 31 != 0,
-                _ => false
+            let code = ConditionCode {
+                sf: (e >> 31 & 1) != 0,
+                zf: e == 0,
+                of: match opfun {
+                    // a, b have the same sign and a, e have different sign
+                    ADD => (!(a ^ b) & (a ^ e)) >> 31 != 0,
+                    // (b - a): a, b have different sign and b, e have different sign
+                    SUB => ((a ^ b) & (b ^ e)) >> 31 != 0,
+                    _ => false
+                }
             };
             if set_cc {
-                *s_sf = cur_sf;
-                *s_of = cur_of;
-                *s_zf = cur_zf;
+                *inner_cc = code;
             }
-            *sf = *s_sf;
-            *of = *s_of;
-            *zf = *s_zf;
-            tracing::info!("CC: a = {:#x}, b = {:#x}, e = {:#x}, sf = {sf}, of = {of}, zf = {zf}", a, b, e);
+            *cc = *inner_cc;
+            tracing::info!("CC: a = {:#x}, b = {:#x}, e = {:#x}, cc: {cc:?}", a, b, e);
         }
 
-        Condition cond {
-            .input(condfun: u8, sf: bool, of: bool, zf: bool)
+        /// Instructions like CMOVX or JX needs to check the condition code based
+        /// on the function code, which is simulated by this unit.
+        InstructionCondition cond {
+            .input(condfun: u8, cc: ConditionCode)
             .output(cnd: bool)
         } {
+            let ConditionCode {sf, zf, of} = cc;
             *cnd = match condfun {
                 YES => true,
                 E => zf,
@@ -243,12 +253,10 @@ impl HardwareUnits for Units {
             pc_inc: PCIncrement {},
             reg_file: RegisterFile { state: [0; 16] },
             alu: ArithmetcLogicUnit {},
-            cc: ConditionCode {
-                s_sf: false,
-                s_of: false,
-                s_zf: false,
+            reg_cc: RegisterCC {
+                inner_cc: ConditionCode::default(),
             },
-            cond: Condition {},
+            cond: InstructionCondition {},
             dmem: DataMemory { binary: memory },
         }
     }
