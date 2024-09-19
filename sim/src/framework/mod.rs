@@ -4,9 +4,7 @@ mod propagate;
 
 pub trait HardwareUnits {
     /// A set of hardware units should be initialized from a given memory.
-    fn init(memory: [u8; MEM_SIZE]) -> Self;
-    /// Get current memory data.
-    fn mem(&self) -> [u8; MEM_SIZE];
+    fn init(memory: MemData) -> Self;
     /// Return the registers and their values.
     ///
     /// (register_code, value)
@@ -19,6 +17,26 @@ pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propa
 /// No matter what architecture we are using, memory store must exist. Otherwise
 /// we have no place to store instructions.
 pub const MEM_SIZE: usize = 1 << 20;
+
+pub struct MemData(std::rc::Rc<std::cell::RefCell<[u8; MEM_SIZE]>>);
+
+impl Clone for MemData {
+    fn clone(&self) -> Self {
+        Self(std::rc::Rc::clone(&self.0))
+    }
+}
+
+impl MemData {
+    pub fn init(data: [u8; MEM_SIZE]) -> Self {
+        Self(std::rc::Rc::new(std::cell::RefCell::new(data)))
+    }
+    pub fn read(&self) -> std::cell::Ref<'_, [u8; MEM_SIZE]> {
+        self.0.borrow()
+    }
+    pub fn write(&self) -> std::cell::RefMut<'_, [u8; MEM_SIZE]> {
+        self.0.borrow_mut()
+    }
+}
 
 pub enum CpuStatus {
     CycleStart,
@@ -87,7 +105,7 @@ impl<T: CpuArch> PipeSim<T> {
     /// Initialize the simulator with given memory
     ///
     /// tty_out: whether to print rich-text information
-    pub fn new(memory: [u8; crate::framework::MEM_SIZE], tty_out: bool) -> Self {
+    pub fn new(memory: MemData, tty_out: bool) -> Self {
         Self {
             circuit: T::build_circuit(),
             cur_inter: T::Inter::default(),
@@ -108,9 +126,6 @@ impl<T: CpuArch> PipeSim<T> {
     }
     pub fn cycle_count(&self) -> u64 {
         self.cycle_count
-    }
-    pub fn mem(&self) -> [u8; MEM_SIZE] {
-        self.units.mem()
     }
     /// Get the registers and their values
     pub fn registers(&self) -> Vec<(u8, u64)> {

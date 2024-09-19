@@ -1,9 +1,6 @@
 //! This module defines hardware units used in the stupid pipeline.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::framework::HardwareUnits;
+use crate::framework::{HardwareUnits, MemData};
 use crate::isa::op_code::*;
 use crate::{define_units, framework::MEM_SIZE};
 
@@ -27,9 +24,9 @@ define_units! {
             .output(
                 lower: u8, higher: u8, error: bool
             )
-            binary: Rc<RefCell<[u8; MEM_SIZE]>>
+            binary: MemData
         } {
-            let binary: &[u8; MEM_SIZE] = &binary.borrow();
+            let binary: &[u8; MEM_SIZE] = &binary.read();
             if pc >= MEM_SIZE as u64 {
                 *error = true;
             } else {
@@ -57,18 +54,11 @@ define_units! {
 
 impl HardwareUnits for Units {
     /// Init CPU harewre with given memory.
-    fn init(memory: [u8; MEM_SIZE]) -> Self {
-        let cell = std::rc::Rc::new(RefCell::new(memory));
+    fn init(memory: MemData) -> Self {
         Self {
-            imem: InstructionMemory {
-                binary: cell.clone(),
-            },
+            imem: InstructionMemory { binary: memory },
             alu: ArithmetcLogicUnit {},
         }
-    }
-
-    fn mem(&self) -> [u8; MEM_SIZE] {
-        *self.imem.binary.borrow()
     }
 
     fn registers(&self) -> Vec<(u8, u64)> {

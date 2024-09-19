@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use interpolator::{format, Formattable};
 use y86_sim::architectures::pipe_full::Arch;
-use y86_sim::framework::PipeSim;
+use y86_sim::framework::{MemData, PipeSim};
 
 #[allow(non_upper_case_globals)]
 const vals: [i64; 3] = [0x100, 0x020, 0x004];
@@ -46,7 +46,8 @@ fn test_reg_op() -> anyhow::Result<()> {
 
                 let src = format(source, args)?;
                 let obj = make_obj(&src)?;
-                let mut pipe = PipeSim::<Arch>::new(obj.obj.init_mem(), false);
+                let mem = MemData::init(obj.obj.init_mem());
+                let mut pipe = PipeSim::<Arch>::new(mem, false);
                 while !pipe.is_terminate() {
                     pipe.step();
                 }

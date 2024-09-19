@@ -5,8 +5,8 @@ use std::{
     io::{BufReader, BufWriter, Read, Write},
     path::PathBuf,
 };
-use y86_sim::architectures::pipe_full::Arch;
 use y86_sim::framework::CpuSim;
+use y86_sim::{architectures::pipe_full::Arch, framework::MemData};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunProgKind {
@@ -78,7 +78,8 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         let src = std::fs::read_to_string(&program)?;
         let a = y86_sim::assemble(&src, y86_sim::AssembleOption::default())?;
 
-        let sim = y86_sim::framework::PipeSim::<Arch>::new(a.obj.init_mem(), false);
+        let mem = MemData::init(a.obj.init_mem());
+        let sim = y86_sim::framework::PipeSim::<Arch>::new(mem, false);
         let source_path = program.clone();
         let source_info = a.source;
         let source_name = program.file_name().unwrap().to_string_lossy().to_string();

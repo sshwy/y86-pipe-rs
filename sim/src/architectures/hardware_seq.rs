@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::framework::HardwareUnits;
+use crate::framework::MemData;
 use crate::isa::cond_fn::*;
 use crate::isa::op_code::*;
 use crate::isa::reg_code;
@@ -58,9 +59,9 @@ define_units! {
                 /// (i.e. the address is out of the memory range)
                 error: bool, icode: u8, ifun: u8, align: [u8; 9]
             )
-            binary: Rc<RefCell<[u8; MEM_SIZE]>>
+            binary: MemData
         } {
-            let binary: &[u8; MEM_SIZE] = &binary.borrow();
+            let binary: &[u8; MEM_SIZE] = &binary.read();
             if pc + 10 > MEM_SIZE as u64 {
                 *error = true;
             } else {
@@ -194,7 +195,7 @@ define_units! {
                 /// Indicate if the address is invalid.
                 error: bool
             )
-            binary: Rc<RefCell<[u8; MEM_SIZE]>>
+            binary: MemData
         } {
             if addr + 8 >= MEM_SIZE as u64 {
                 *dataout = 0;
@@ -204,11 +205,11 @@ define_units! {
             *error = false;
             if write {
                 tracing::info!("write memory: addr = {:#x}, datain = {:#x}", addr, datain);
-                let section: &mut [u8] = &mut binary.borrow_mut()[(addr as usize)..];
+                let section: &mut [u8] = &mut binary.write()[(addr as usize)..];
                 put_u64(section, datain);
                 *dataout = 0;
             } else if read {
-                *dataout = get_u64(&binary.borrow()[(addr as usize)..]);
+                *dataout = get_u64(&binary.read()[(addr as usize)..]);
             }
         }
     }
@@ -216,12 +217,11 @@ define_units! {
 
 impl HardwareUnits for Units {
     /// Init CPU harewre with given memory.
-    fn init(memory: [u8; MEM_SIZE]) -> Self {
-        let cell = std::rc::Rc::new(RefCell::new(memory));
+    fn init(memory: MemData) -> Self {
         let reg = Rc::new(RefCell::new([0; 16]));
         Self {
             imem: InstructionMemory {
-                binary: cell.clone(),
+                binary: memory.clone(),
             },
             ialign: Align {},
             pc_inc: PCIncrement {},
@@ -234,12 +234,8 @@ impl HardwareUnits for Units {
                 s_zf: false,
             },
             cond: Condition {},
-            dmem: DataMemory { binary: cell },
+            dmem: DataMemory { binary: memory },
         }
-    }
-
-    fn mem(&self) -> [u8; MEM_SIZE] {
-        *self.dmem.binary.borrow()
     }
 
     fn registers(&self) -> Vec<(u8, u64)> {
