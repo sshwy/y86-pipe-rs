@@ -80,11 +80,13 @@ impl PropOrderBuilder {
             edges: Default::default(),
         }
     }
+
     pub fn add_edge(&mut self, from: String, to: String) {
         self.nodes.insert(from.clone());
         self.nodes.insert(to.clone());
         self.edges.push((from.clone(), to.clone()));
     }
+
     /// Set unit `name` as runnable
     pub fn add_unit_node(&mut self, unit_name: &'static str) {
         if !self.runnable_nodes_set.insert(unit_name.to_string()) {
@@ -92,14 +94,17 @@ impl PropOrderBuilder {
         }
         self.runnable_nodes.push((true, unit_name));
     }
+
     pub fn add_unit_input(&mut self, unit_name: &'static str, field_name: &'static str) {
         let full_name = String::from(unit_name) + "." + field_name;
         self.add_edge(full_name.to_string(), unit_name.to_string());
     }
+
     pub fn add_unit_output(&mut self, unit_name: &'static str, field_name: &'static str) {
         let full_name = String::from(unit_name) + "." + field_name;
         self.add_edge(unit_name.to_string(), full_name.to_string());
     }
+
     pub fn add_intermediate(&mut self, name: &'static str) {
         if !self.runnable_nodes_set.insert(name.to_string()) {
             panic!("duplicate intermediate name: {}", name)
@@ -107,6 +112,7 @@ impl PropOrderBuilder {
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
     }
+
     /// Compute topological order of nodes.
     pub fn build(mut self) -> PropOrder {
         // remove duplicates
@@ -211,8 +217,9 @@ impl<T: CpuCircuit> PropCircuit<T> {
 }
 
 impl<T: CpuCircuit> PropCircuit<T> {
-    /// Generally, a circuit update function accepts output signal from previous units,
-    /// and then emits input signals of the next units or update intermediate signals.
+    /// Generally, a circuit update function accepts output signal from previous
+    /// units, and then emits input signals of the next units or update
+    /// intermediate signals.
     pub fn add_update(
         &mut self,
         name: &'static str,
@@ -260,14 +267,17 @@ where
             panic!("invalid name")
         }
     }
+
     /// Execute a unit.
     pub fn run_unit(&mut self, unit_fn: impl FnOnce(&T::UnitIn, &mut T::UnitOut)) {
         unit_fn(self.unit_in, &mut self.unit_out)
     }
+
     /// Get current signals.
     pub fn signals(&self) -> (T::UnitIn, T::UnitOut) {
         (self.unit_in.clone(), self.unit_out.clone())
     }
+
     pub fn finalize(self) -> (T::UnitOut, Tracer) {
         (self.unit_out, self.tracer)
     }

@@ -1,8 +1,10 @@
 //! This module defines hardware units used in the stupid pipeline.
 
-use crate::framework::{HardwareUnits, MemData};
-use crate::isa::op_code::*;
-use crate::{define_units, framework::MEM_SIZE};
+use crate::{
+    define_units,
+    framework::{HardwareUnits, MemData, MEM_SIZE},
+    isa::op_code::*,
+};
 
 define_units! {
     // stage registers and default values

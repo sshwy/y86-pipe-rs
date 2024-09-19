@@ -1,10 +1,11 @@
 //! This file provides binary representation of y86 instructions
 
+use std::{collections::BTreeMap, fmt::Display};
+
 use crate::{
     asm::{self, Reg},
     framework::MEM_SIZE,
 };
-use std::{collections::BTreeMap, fmt::Display};
 
 /// Maximum size of the assembled binary.
 const BIN_SIZE: usize = 1 << 16;
@@ -121,7 +122,8 @@ pub struct LineInfo {
 
 /// object file
 ///
-/// while y86 language support 64-bit address, we only consider address < 0x10000.
+/// while y86 language support 64-bit address, we only consider address <
+/// 0x10000.
 pub struct Object {
     binary: [u8; BIN_SIZE],
     /// basically labels
@@ -135,6 +137,7 @@ impl Object {
             self.binary[addr + i] = byte // little endian
         }
     }
+
     /// Initialize memory from assembled binary.
     pub fn init_mem(&self) -> [u8; MEM_SIZE] {
         let mut mem = [0; MEM_SIZE];
@@ -158,6 +161,7 @@ impl SourceInfo {
         assert!(line > 0);
         self.0.get(line as usize - 1)
     }
+
     pub fn get_line_number_by_addr(&self, addr: u64) -> Option<i64> {
         self.0
             .iter()

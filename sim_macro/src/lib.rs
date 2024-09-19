@@ -150,6 +150,7 @@ impl HclData {
             }
         }
     }
+
     fn render_signal_updater(
         signal: &SignalDef,
         expr_mapper: impl Fn(LValue) -> LValue + Clone,
@@ -249,6 +250,7 @@ impl HclData {
             }
         }
     }
+
     fn render_build_circuit(&self) -> proc_macro2::TokenStream {
         let inter = &quote::format_ident!("c_");
         let inter_names = self
@@ -368,6 +370,7 @@ impl HclData {
             }
         }
     }
+
     fn render_update(&self) -> proc_macro2::TokenStream {
         quote! {
             /// Simulate one cycle of the CPU, update the input and output signals
@@ -399,6 +402,7 @@ impl HclData {
             }
         }
     }
+
     fn render_get_stage_info(&self) -> proc_macro2::TokenStream {
         let mut stage_items = self
             .stage_decls
@@ -449,6 +453,7 @@ impl HclData {
             }
         }
     }
+
     fn render(&self) -> proc_macro2::TokenStream {
         let hardware = &self.hardware;
         let use_stmts = self
@@ -551,8 +556,8 @@ impl HclData {
 }
 
 /// This macro parse the Hardware Control Language (HCL) introduced in CS:APP3e.
-/// In general, it defines a set of signals, which connects outputs of units to inputs of units
-/// through Boolean expressions.
+/// In general, it defines a set of signals, which connects outputs of units to
+/// inputs of units through Boolean expressions.
 #[proc_macro]
 pub fn hcl(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let data: HclData = syn::parse(item).unwrap();

@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
 use binutils::{clap, verbose};
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use y86_sim::architectures::{arch_names, create_sim};
-use y86_sim::framework::MemData;
-use y86_sim::{assemble, mem_diff, AssembleOption};
+use y86_sim::{
+    architectures::{arch_names, create_sim},
+    assemble,
+    framework::MemData,
+    mem_diff, AssembleOption,
+};
 
 fn after_help() -> String {
     let extras = y86_sim::architectures::EXTRA_ARCH_NAMES;

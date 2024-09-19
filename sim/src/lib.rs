@@ -6,10 +6,8 @@ pub mod isa;
 mod object;
 mod utils;
 
-pub use asm::assemble;
-pub use asm::AssembleOption;
-pub use object::ObjectExt;
-pub use object::SourceInfo;
+pub use asm::{assemble, AssembleOption};
+pub use object::{ObjectExt, SourceInfo};
 pub use utils::{mem_diff, mem_print};
 
 #[cfg(test)]

@@ -30,9 +30,11 @@ impl MemData {
     pub fn init(data: [u8; MEM_SIZE]) -> Self {
         Self(std::rc::Rc::new(std::cell::RefCell::new(data)))
     }
+
     pub fn read(&self) -> std::cell::Ref<'_, [u8; MEM_SIZE]> {
         self.0.borrow()
     }
+
     pub fn write(&self) -> std::cell::RefMut<'_, [u8; MEM_SIZE]> {
         self.0.borrow_mut()
     }
@@ -43,19 +45,20 @@ pub enum CpuStatus {
     CycleEnd,
 }
 
-/// During a CPU cycle, signals in memory devices (stage units) are propagated through
-/// the combinational logic circuits. The signals are then latched into the pipeline
-/// registers at the end of the cycle. Therefore we can use two basic operations to
-/// simulate the pipeline.
+/// During a CPU cycle, signals in memory devices (stage units) are propagated
+/// through the combinational logic circuits. The signals are then latched into
+/// the pipeline registers at the end of the cycle. Therefore we can use two
+/// basic operations to simulate the pipeline.
 pub trait CpuSim {
-    /// Initiate the next cycle or the first cycle. This function should be called
-    /// after calling [`CpuSim::propagate_signals`]. Otherwise the behavior is undefined.
+    /// Initiate the next cycle or the first cycle. This function should be
+    /// called after calling [`CpuSim::propagate_signals`]. Otherwise the
+    /// behavior is undefined.
     fn initiate_next_cycle(&mut self);
 
-    /// Propagate signals through the combinational logic circuits. This function
-    /// should be called after [`CpuSim::initiate_next_cycle`]. Otherwise the
-    /// behavior is undefined. This function should change the terminal state of the
-    /// simulator if the simulation is terminated.
+    /// Propagate signals through the combinational logic circuits. This
+    /// function should be called after [`CpuSim::initiate_next_cycle`].
+    /// Otherwise the behavior is undefined. This function should change the
+    /// terminal state of the simulator if the simulation is terminated.
     fn propagate_signals(&mut self);
 
     /// Get the current program counter
@@ -93,11 +96,13 @@ pub type Signals<A> = (
     <A as CpuCircuit>::Inter,
 );
 
-/// Pipeline simulator. A general CPU pipeline involves several pipeline registers
-/// (flip-flops) and combinational logic circuits.
+/// Pipeline simulator. A general CPU pipeline involves several pipeline
+/// registers (flip-flops) and combinational logic circuits.
 ///
-/// - Combinatorial logics: From `cur_state`, through `cur_unit_in`, `cur_inter`, `cur_unit_out`, to `nex_state`.
-/// - Clock tick: from `nex_state`, controlled by stage input signals, to `cur_state`.
+/// - Combinatorial logics: From `cur_state`, through `cur_unit_in`,
+///   `cur_inter`, `cur_unit_out`, to `nex_state`.
+/// - Clock tick: from `nex_state`, controlled by stage input signals, to
+///   `cur_state`.
 pub struct PipeSim<T: CpuArch> {
     pub(crate) circuit: PropCircuit<T>,
     pub(crate) cur_unit_in: T::UnitIn,

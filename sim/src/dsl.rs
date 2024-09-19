@@ -8,17 +8,17 @@
 /// 2. Signals start from the outputs of a functional unit (or stage unit), go
 ///    through pipes and combinational logics, finally reach the inputs of the
 ///    next functional unit or stage unit (stage units have inputs!).
-/// 3. On receving input signals, functional units process its input signals
-///    and update its output signals, while stage units just store the inputs.
+/// 3. On receving input signals, functional units process its input signals and
+///    update its output signals, while stage units just store the inputs.
 /// 4. After all signals reaching their destinations, the cycle ends. The inputs
 ///    of stage units will become the starting signals of the next cycle.
 ///
 /// **WARNING**:
-/// 1. Do not use `.stage` with `.output` in the same unit. The
-///    behavior is undefined.
-/// 2. The parameters in `.stage` must be `bubble` and `stall`. In this implementation,
-///    pipeline registers (flip-flop) are considered as a special unit that is trigger
-///    at the end of the cycle.
+/// 1. Do not use `.stage` with `.output` in the same unit. The behavior is
+///    undefined.
+/// 2. The parameters in `.stage` must be `bubble` and `stall`. In this
+///    implementation, pipeline registers (flip-flop) are considered as a
+///    special unit that is trigger at the end of the cycle.
 #[macro_export]
 macro_rules! define_units {
     (PipeRegs { $(

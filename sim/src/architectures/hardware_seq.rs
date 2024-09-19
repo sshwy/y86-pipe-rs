@@ -1,20 +1,13 @@
 //! This module defines hardware units used in the classic RISC-V seq.
 //! The units are defined using the `define_units!` macro.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
-use crate::framework::HardwareUnits;
-use crate::framework::MemData;
-use crate::isa::cond_fn::*;
-use crate::isa::op_code::*;
-use crate::isa::reg_code;
-use crate::isa::reg_code::*;
-use crate::utils::format_reg_val;
 use crate::{
     define_units,
-    framework::MEM_SIZE,
-    utils::{get_u64, put_u64},
+    framework::{HardwareUnits, MemData, MEM_SIZE},
+    isa::{cond_fn::*, op_code::*, reg_code, reg_code::*},
+    utils::{format_reg_val, get_u64, put_u64},
 };
 
 /// Simulator State (at each stage), depending on the hardware design.
@@ -23,15 +16,16 @@ use crate::{
 pub enum Stat {
     /// Indicates that everything is fine.
     Aok = 0,
-    /// The halt state. This state is assigned when the instruction fetcher reads
-    /// the halt instruction. (If your architecture lacks a instruction fetcher,
-    /// there should be some other way to specify the halt state in HCL.)
+    /// The halt state. This state is assigned when the instruction fetcher
+    /// reads the halt instruction. (If your architecture lacks a
+    /// instruction fetcher, there should be some other way to specify the
+    /// halt state in HCL.)
     Hlt = 2,
-    /// This state is assigned when the instruction memory or data memory is accessed
-    /// with an invalid address.
+    /// This state is assigned when the instruction memory or data memory is
+    /// accessed with an invalid address.
     Adr = 3,
-    /// This state is assigned when the instruction fetcher reads an invalid instruction
-    /// code.
+    /// This state is assigned when the instruction fetcher reads an invalid
+    /// instruction code.
     Ins = 4,
 }
 

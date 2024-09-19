@@ -1,18 +1,11 @@
 //! This module defines hardware units used in the classic RISC-V pipeline.
 //! The units are defined using the `define_units!` macro.
 
-use crate::framework::HardwareUnits;
-use crate::framework::MemData;
-use crate::isa::cond_fn::*;
-use crate::isa::inst_code::NOP;
-use crate::isa::op_code::*;
-use crate::isa::reg_code;
-use crate::isa::reg_code::*;
-use crate::utils::format_reg_val;
 use crate::{
     define_units,
-    framework::MEM_SIZE,
-    utils::{get_u64, put_u64},
+    framework::{HardwareUnits, MemData, MEM_SIZE},
+    isa::{cond_fn::*, inst_code::NOP, op_code::*, reg_code, reg_code::*},
+    utils::{format_reg_val, get_u64, put_u64},
 };
 
 /// Simulator State (at each stage), depending on the hardware design.
@@ -21,18 +14,19 @@ use crate::{
 pub enum Stat {
     /// Indicates that everything is fine.
     Aok = 0,
-    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP instruction.
-    /// Initially, all stages are in the bubble state.
+    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP
+    /// instruction. Initially, all stages are in the bubble state.
     Bub = 1,
-    /// The halt state. This state is assigned when the instruction fetcher reads
-    /// the halt instruction. (If your architecture lacks a instruction fetcher,
-    /// there should be some other way to specify the halt state in HCL.)
+    /// The halt state. This state is assigned when the instruction fetcher
+    /// reads the halt instruction. (If your architecture lacks a
+    /// instruction fetcher, there should be some other way to specify the
+    /// halt state in HCL.)
     Hlt = 2,
-    /// This state is assigned when the instruction memory or data memory is accessed
-    /// with an invalid address.
+    /// This state is assigned when the instruction memory or data memory is
+    /// accessed with an invalid address.
     Adr = 3,
-    /// This state is assigned when the instruction fetcher reads an invalid instruction
-    /// code.
+    /// This state is assigned when the instruction fetcher reads an invalid
+    /// instruction code.
     Ins = 4,
 }
 

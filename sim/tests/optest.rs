@@ -3,8 +3,7 @@
 use std::collections::HashMap;
 
 use interpolator::{format, Formattable};
-use y86_sim::architectures::create_sim;
-use y86_sim::framework::MemData;
+use y86_sim::{architectures::create_sim, framework::MemData};
 
 #[allow(non_upper_case_globals)]
 const vals: [i64; 3] = [0x100, 0x020, 0x004];

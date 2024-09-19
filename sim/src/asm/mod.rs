@@ -1,6 +1,5 @@
 //! This module provides parsing utilities for the y86 assembly.
 use anyhow::{bail, Context, Result};
-
 use pest::Parser;
 use pest_derive::Parser;
 
@@ -211,6 +210,7 @@ impl<ImmType: Clone> Inst<ImmType> {
             IOPQ(_, _, _) => 10,
         }
     }
+
     pub fn icode(&self) -> u8 {
         use isa::inst_code::*;
         match &self {
@@ -249,8 +249,8 @@ struct ParseInput<'a> {
 }
 
 impl<'a> IntoIterator for ParseInput<'a> {
-    type Item = ParseInput<'a>;
     type IntoIter = ParseInputs<'a>;
+    type Item = ParseInput<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         ParseInputs {
@@ -286,10 +286,12 @@ impl<'a> ParseInputs<'a> {
     fn next_str(&mut self) -> &str {
         self.next().unwrap().as_str()
     }
+
     /// Parse next token as register
     fn next_reg(&mut self) -> Reg {
         Reg::from(self.next().unwrap().pair)
     }
+
     /// Parse next token as address
     fn next_addr(&mut self) -> Addr {
         Addr::from(self.next().unwrap())

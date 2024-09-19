@@ -1,5 +1,6 @@
-use crate::framework::MEM_SIZE;
 use binutils::clap::builder::styling::*;
+
+use crate::framework::MEM_SIZE;
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {
