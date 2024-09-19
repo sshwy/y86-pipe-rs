@@ -61,7 +61,6 @@ pub struct PropOrderBuilder {
     runnable_nodes_set: HashSet<String>,
     /// Runnable nodes includes units and intermediate signals.
     runnable_nodes: NameList,
-    unit_nodes: Vec<String>,
     nodes: HashSet<String>,
     edges: Vec<(String, String)>,
 }
@@ -76,9 +75,8 @@ impl PropOrderBuilder {
     pub fn new() -> Self {
         Self {
             runnable_nodes_set: Default::default(),
-            nodes: Default::default(),
             runnable_nodes: Default::default(),
-            unit_nodes: Default::default(),
+            nodes: Default::default(),
             edges: Default::default(),
         }
     }
@@ -93,7 +91,6 @@ impl PropOrderBuilder {
             panic!("duplicate unit name: {}", unit_name)
         }
         self.runnable_nodes.push((true, unit_name));
-        self.unit_nodes.push(unit_name.to_string());
     }
     pub fn add_unit_input(&mut self, unit_name: &'static str, field_name: &'static str) {
         let full_name = String::from(unit_name) + "." + field_name;
@@ -110,7 +107,8 @@ impl PropOrderBuilder {
         self.runnable_nodes.push((false, name));
         self.nodes.insert(name.to_string());
     }
-    fn init_deps(&mut self) {
+    /// Compute topological order of nodes.
+    pub fn build(mut self) -> PropOrder {
         // remove duplicates
         self.edges = std::mem::take(&mut self.edges)
             .into_iter()
@@ -119,10 +117,20 @@ impl PropOrderBuilder {
             .collect::<Vec<(String, String)>>();
 
         self.edges.sort();
-    }
-    /// Compute topological order of nodes.
-    pub fn build(mut self) -> PropOrder {
-        self.init_deps();
+        // check if every input of units has at least one source
+        let independent_unit_in = self
+            .runnable_nodes
+            .iter()
+            .filter(|(is_unit, _)| *is_unit)
+            .find_map(|(_, unit_name)| {
+                self.edges
+                    .iter()
+                    .filter(|(_, to)| to == unit_name)
+                    .find(|(unit_in, _)| self.edges.iter().all(|(_, to)| to != unit_in))
+            });
+        if let Some(e) = independent_unit_in {
+            panic!("unit input {} has no source", e.0)
+        }
 
         let levels = topo(self.nodes.iter(), self.edges.iter().map(|(a, b)| (a, b)));
         let order: Vec<(bool, &'static str)> = levels

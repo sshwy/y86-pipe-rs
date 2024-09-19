@@ -23,6 +23,5 @@ Note: the behavior of `cargo-expand` is incorrect.
 
 todo: test sim!!!
 todo: cargo vendor
-todo: strict mode: check if all inputs are provided for each unit
 todo: debugger switch arch
 to test: RUST_MIN_STACK=104857600 cargo test

@@ -3,15 +3,11 @@ pub mod hardware_full;
 pub mod hardware_seq;
 pub mod hardware_stupid;
 
-// This module is not public because no one should use it.
-mod pipe_invalid;
-
-// Builtin pipeline architectures
+// Architectures
 mod builtin;
-pub use builtin::seq_std;
-
-// Extra pipeline architectures
 mod extra;
+mod invalid;
+
 pub use extra::ARCH_NAMES as EXTRA_ARCH_NAMES;
 
 use crate::framework::{CpuSim, MemData, PipeSim};

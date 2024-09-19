@@ -5,7 +5,7 @@ use y86_sim::architectures::{arch_names, create_sim};
 use y86_sim::framework::MemData;
 use y86_sim::{assemble, mem_diff, AssembleOption};
 
-fn print_version() -> String {
+fn after_help() -> String {
     let extras = y86_sim::architectures::EXTRA_ARCH_NAMES;
     use binutils::clap::builder::styling::*;
     let t = Style::new()
@@ -35,7 +35,7 @@ fn print_version() -> String {
 #[command(
     author,
     version,
-    after_help = print_version(),
+    after_help = after_help(),
     about,
     long_about = None,
     styles = binutils::get_styles(),
