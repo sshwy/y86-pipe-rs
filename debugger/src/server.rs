@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 use y86_sim::framework::CpuSim;
-use y86_sim::{architectures::pipe_full::Arch, framework::MemData};
+use y86_sim::{architectures::create_sim, framework::MemData};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunProgKind {
@@ -28,7 +28,7 @@ pub struct Inner {
     source_name: String,
     scopes: Vec<types::Scope>,
     stage_info: Vec<y86_sim::framework::StageInfo>,
-    sim: y86_sim::framework::PipeSim<Arch>,
+    sim: Box<dyn CpuSim>,
 }
 
 pub struct DebugServer<R: Read, W: Write> {
@@ -79,7 +79,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         let a = y86_sim::assemble(&src, y86_sim::AssembleOption::default())?;
 
         let mem = MemData::init(a.obj.init_mem());
-        let sim = y86_sim::framework::PipeSim::<Arch>::new(mem, false);
+        let sim = create_sim("pipe_full".into(), mem, false);
         let source_path = program.clone();
         let source_info = a.source;
         let source_name = program.file_name().unwrap().to_string_lossy().to_string();

@@ -60,6 +60,18 @@ pub trait CpuSim {
 
     /// Get the current program counter
     fn program_counter(&self) -> u64;
+
+    /// Whether the simulation is terminated
+    fn is_terminate(&self) -> bool;
+
+    fn cycle_count(&self) -> u64;
+    /// Get the registers and their values
+    fn registers(&self) -> Vec<(u8, u64)>;
+
+    fn get_stage_info(&self) -> Vec<StageInfo>;
+
+    // todo: remove it
+    fn step(&mut self);
 }
 
 // here we use trait to collect the types
@@ -118,18 +130,6 @@ impl<T: CpuArch> PipeSim<T> {
             tty_out,
             cycle_count: 0,
         }
-    }
-
-    /// Whether the simulation is terminated
-    pub fn is_terminate(&self) -> bool {
-        self.terminate
-    }
-    pub fn cycle_count(&self) -> u64 {
-        self.cycle_count
-    }
-    /// Get the registers and their values
-    pub fn registers(&self) -> Vec<(u8, u64)> {
-        self.units.registers()
     }
 }
 

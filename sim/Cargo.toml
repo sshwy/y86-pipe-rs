@@ -3,7 +3,7 @@ name = "y86-sim"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-description = "Y86 simulator written in Rust"
+description = "Y86 assembler and pipeline simulator written in Rust"
 authors = ["Weiyao Huang <jy.cat@qq.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

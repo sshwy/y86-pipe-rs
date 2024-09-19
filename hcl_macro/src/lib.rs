@@ -1,3 +1,5 @@
+use std::{env, path::PathBuf};
+
 use expr::LValue;
 use items::{SignalDef, SignalSourceExpr, SignalSwitch};
 use quote::{format_ident, quote, ToTokens};
@@ -440,7 +442,7 @@ impl HclData {
         quote! {
             #[allow(unused)]
             #[allow(non_snake_case)]
-            pub fn get_stage_info(&self) -> Vec<crate::framework::StageInfo> {
+            fn get_stage_info(&self) -> Vec<crate::framework::StageInfo> {
                 let mut info = vec![#stage_items];
                 #sig_stmts
                 info
@@ -486,8 +488,38 @@ impl HclData {
 
             impl crate::framework::PipeSim<Arch> {
                 #update_fn
+            }
+            impl crate::framework::CpuSim for crate::framework::PipeSim<Arch> {
+                fn initiate_next_cycle(&mut self) {
+                    self.cur_state.mux(&self.nex_state);
+                }
+                fn propagate_signals(&mut self) {
+                    self.update();
+                    self.cycle_count += 1;
+
+                    if self.cur_inter.#termination {
+                        self.terminate = true;
+                    }
+                }
+                fn program_counter(&self) -> u64 {
+                    self.cur_inter.#pc_name
+                }
+                /// Whether the simulation is terminated
+                fn is_terminate(&self) -> bool {
+                    self.terminate
+                }
+                fn cycle_count(&self) -> u64 {
+                    self.cycle_count
+                }
+                /// Get the registers and their values
+                fn registers(&self) -> Vec<(u8, u64)> {
+                    use crate::framework::HardwareUnits;
+                    self.units.registers()
+                }
+
                 #get_stage_info_fn
-                pub fn step(&mut self) {
+
+                fn step(&mut self) {
                     use crate::framework::CpuSim;
                     tracing::info!("{:=^74}", " Run Cycle ");
                     self.propagate_signals();
@@ -514,22 +546,6 @@ impl HclData {
                     }
                 }
             }
-            impl crate::framework::CpuSim for crate::framework::PipeSim<Arch> {
-                fn initiate_next_cycle(&mut self) {
-                    self.cur_state.mux(&self.nex_state);
-                }
-                fn propagate_signals(&mut self) {
-                    self.update();
-                    self.cycle_count += 1;
-
-                    if self.cur_inter.#termination {
-                        self.terminate = true;
-                    }
-                }
-                fn program_counter(&self) -> u64 {
-                    self.cur_inter.#pc_name
-                }
-            }
         }
     }
 }
@@ -541,4 +557,74 @@ impl HclData {
 pub fn hcl(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let data: HclData = syn::parse(item).unwrap();
     data.render().into()
+}
+
+/// This macro can only be used in the `sim` crate.
+#[proc_macro]
+pub fn extra_pipelines(_item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let dir = PathBuf::from(
+        env::var_os("CARGO_MANIFEST_DIR")
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap(),
+    );
+    assert!(dir.ends_with("sim"));
+
+    let mut idents = Vec::new();
+
+    let dir = dir.join("src/architectures/extra");
+    for entry in std::fs::read_dir(dir).unwrap().filter_map(Result::ok) {
+        if entry.file_type().unwrap().is_file() && entry.file_name() != "mod.rs" {
+            let mod_name = entry
+                .file_name()
+                .to_string_lossy()
+                .to_string()
+                .strip_suffix(".rs")
+                .unwrap()
+                .to_string();
+            let mod_ident = format_ident!("{}", mod_name);
+            idents.push(mod_ident);
+        }
+    }
+
+    let mod_stmts = idents
+        .iter()
+        .map(|id| quote! {pub mod #id;})
+        .reduce(|a, b| quote! { #a #b })
+        .unwrap_or_default();
+
+    let case_stmts = idents
+        .iter()
+        .map(|id| {
+            let id_name = id.to_string();
+            quote! {
+                #id_name => Box::new(super::PipeSim::<#id::Arch>::new(memory, tty_out)),
+            }
+        })
+        .reduce(|a, b| quote! { #a #b })
+        .unwrap_or_default();
+
+    let name_list = idents
+        .iter()
+        .map(|id| id.to_string())
+        .map(|s| quote! { #s })
+        .reduce(|a, b| quote! { #a, #b })
+        .unwrap_or_default();
+
+    let n_name = idents.len();
+
+    quote! {
+        #mod_stmts
+
+        pub const ARCH_NAMES: [&'static str; #n_name] = [#name_list];
+
+        pub fn create_sim(
+            kind: String, memory: super::MemData, tty_out: bool
+        ) -> Box<dyn super::CpuSim> {
+            match kind.as_str() {
+                #case_stmts
+                _ => panic!("Unknown architecture: {}", kind),
+            }
+        }
+    }
+    .into()
 }

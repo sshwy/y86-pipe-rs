@@ -49,7 +49,10 @@ pub fn topo<Node: Copy + Eq + Hash + Debug>(
     }
 
     if !degree_level.is_empty() {
-        panic!("not DAG, degrees: {:?}", degree_level)
+        panic!(
+            "The computational graph of your CPU pipeline is not a DAG! degrees: {:?}",
+            degree_level
+        )
     }
 
     levels
