@@ -155,7 +155,7 @@ impl PropOrderBuilder {
             for from in self
                 .edges
                 .iter()
-                .filter_map(|(from, to)| (to == node).then(|| from))
+                .filter_map(|(from, to)| (to == node).then_some(from))
             {
                 let dist_from = dist.get(&from).copied().unwrap_or(0);
                 let dist_node = dist.entry(node).or_default();

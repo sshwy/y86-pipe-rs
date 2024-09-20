@@ -75,7 +75,7 @@ define_units! {
                 *align = binary[pc+1..pc+10].try_into().unwrap();
             }
 
-            if *icode == inst_code::CALL as u8 {
+            if *icode == inst_code::CALL {
                 tracing::info!("CALL instruction fetched");
             }
         }
@@ -170,7 +170,7 @@ define_units! {
             };
             if set_cc {
                 *inner_cc = code;
-                tracing::info!("CC update: a = {:#x}, b = {:#x}, e = {:#x}, cc: {code:?}, opfun: {}", a, b, e, 
+                tracing::info!("CC update: a = {:#x}, b = {:#x}, e = {:#x}, cc: {code:?}, opfun: {}", a, b, e,
                     crate::isa::op_code::name_of(opfun));
             }
             *cc = *inner_cc;

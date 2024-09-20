@@ -3,6 +3,7 @@ use binutils::{
     verbose,
 };
 use clap::Parser;
+use y86_dbg::SimOption;
 use y86_sim::architectures::arch_names;
 
 fn after_help() -> String {
@@ -52,6 +53,10 @@ struct Args {
 
     #[arg(short = 'p', long, default_value = "2345")]
     port: Option<u16>,
+
+    /// Limit the maximum number of CPU cycles to prevent infinite loop
+    #[arg(long, default_value = "50000")]
+    max_cpu_cycle: Option<u64>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -76,7 +81,13 @@ fn main() -> anyhow::Result<()> {
         .exit();
     }
 
-    y86_dbg::start_tcp_listener(args.port.unwrap(), arch)?;
+    y86_dbg::start_tcp_listener(
+        args.port.unwrap(),
+        SimOption {
+            arch,
+            max_cpu_cycle: args.max_cpu_cycle.unwrap(),
+        },
+    )?;
 
     Ok(())
 }

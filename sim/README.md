@@ -21,6 +21,10 @@ Hope you enjoy.
 
 Note: the behavior of `cargo-expand` is incorrect.
 
+to test: RUST_MIN_STACK=104857600 cargo test
+
 todo: test sim!!!
 todo: cargo vendor
-to test: RUST_MIN_STACK=104857600 cargo test
+todo: check panics do not affect autograder
+
+todo: use max_dist to grader ncopy

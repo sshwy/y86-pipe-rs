@@ -63,6 +63,10 @@ struct Args {
     #[arg(long)]
     run: bool,
 
+    /// Limit the maximum number of CPU cycles to prevent infinite loop
+    #[arg(long, default_value = "100000")]
+    max_cpu_cycle: Option<u64>,
+
     /// Print logs during simulation
     #[command(flatten)]
     verbose: verbose::Verbosity,
@@ -110,8 +114,14 @@ fn main() -> Result<()> {
         }
         let mut pipe = create_sim(arch, mem.clone(), true);
 
+        let max_cpu_cycle = args.max_cpu_cycle.unwrap();
         while !pipe.is_terminate() {
             pipe.step();
+            if pipe.cycle_count() > max_cpu_cycle {
+                anyhow::bail!(
+                    "exceed maximum CPU cycle limit (use --max-cpu-cycle to change the limit)"
+                );
+            }
         }
 
         mem_diff(&obj.obj.init_mem(), &mem.read());

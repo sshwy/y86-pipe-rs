@@ -11,6 +11,8 @@ use y86_sim::{
     framework::{CpuSim, MemData},
 };
 
+use crate::SimOption;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunProgKind {
     SingleStep,
@@ -42,7 +44,7 @@ pub struct DebugServer<R: Read, W: Write> {
     /// Path of the source file (this debugger only supports single source file)
     server: dap::server::Server<R, W>,
     status: ServerStatus,
-    arch: String,
+    sim_opt: SimOption,
 }
 
 const THREAD_ID: i64 = 1;
@@ -62,13 +64,13 @@ struct LaunchOption {
 }
 
 impl<R: Read, W: Write> DebugServer<R, W> {
-    pub fn new(input: R, output: W, arch: String) -> Self {
+    pub fn new(input: R, output: W, option: SimOption) -> Self {
         Self {
             inner: None,
             server: dap::server::Server::new(BufReader::new(input), BufWriter::new(output)),
             breakpoints: Vec::new(),
             status: ServerStatus::ServeReq,
-            arch,
+            sim_opt: option,
         }
     }
 
@@ -85,7 +87,7 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         let a = y86_sim::assemble(&src, y86_sim::AssembleOption::default())?;
 
         let mem = MemData::init(a.obj.init_mem());
-        let sim = create_sim(self.arch.clone(), mem, false);
+        let sim = create_sim(self.sim_opt.arch.clone(), mem, false);
         let source_path = program.clone();
         let source_info = a.source;
         let source_name = program.file_name().unwrap().to_string_lossy().to_string();
@@ -498,6 +500,20 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                     .send_event(Event::Stopped(events::StoppedEventBody {
                         reason: types::StoppedEventReason::Step,
                         description: Some("Stop at next step".to_string()),
+                        thread_id: Some(THREAD_ID),
+                        preserve_focus_hint: Some(false),
+                        text: Some(format!("pc = {pc:#x}, cycle count = {}", sim.cycle_count())),
+                        all_threads_stopped: None,
+                        hit_breakpoint_ids: None,
+                    }))?;
+                self.status = ServerStatus::ServeReq;
+                break;
+            }
+            if sim.cycle_count() >= self.sim_opt.max_cpu_cycle {
+                self.server
+                    .send_event(Event::Stopped(events::StoppedEventBody {
+                        reason: types::StoppedEventReason::Step,
+                        description: Some("CPU max cycle reached".to_string()),
                         thread_id: Some(THREAD_ID),
                         preserve_focus_hint: Some(false),
                         text: Some(format!("pc = {pc:#x}, cycle count = {}", sim.cycle_count())),
