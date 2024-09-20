@@ -525,18 +525,25 @@ impl HclData {
                 #get_stage_info_fn
 
                 fn step(&mut self) {
-                    use crate::framework::CpuSim;
-                    tracing::info!("{:=^74}", " Run Cycle ");
-                    self.propagate_signals();
-
-                    tracing::debug!("{:?}", self.get_stage_info());
+                    use binutils::clap::builder::styling::*;
+                    let title_style = Style::new().bold();
 
                     if self.tty_out {
-                        use binutils::clap::builder::styling::*;
-                        let title_style = Style::new().bold();
                         println!(
                             "{title_style}{summary:=^80}{title_style:#}",
-                            summary = format!(" [Cycle {}, pc={:#x}] ", self.cycle_count, self.program_counter()),
+                            summary = format!(" [Cycle {}] ", self.cycle_count + 1),
+                        );
+                    }
+
+                    use crate::framework::CpuSim;
+                    self.propagate_signals();
+
+                    tracing::trace!("{:?}", self.get_stage_info());
+
+                    if self.tty_out {
+                        println!(
+                            "{title_style}PC = {:#x}{title_style:#}",
+                            self.program_counter(),
                         );
 
                         self.print_state();
