@@ -182,6 +182,7 @@ macro_rules! define_units {
     };
 }
 
+/// In [`sim_macro::hcl`], The `a in {...}` expression is transformed into `mtc(a, [...])`.
 pub(crate) fn mtc<T: Eq>(sig: T, choice: impl AsRef<[T]>) -> bool {
     for c in choice.as_ref() {
         if *c == sig {

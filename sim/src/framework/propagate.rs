@@ -13,6 +13,10 @@ pub type NameList = Vec<(bool, &'static str)>;
 #[derive(Debug, Default)]
 pub struct PropOrder {
     pub(crate) order: NameList,
+    /// `max_dist` is the maximum number of hardware units in a cycle that has
+    /// to be executed one after another. It is used to determine the time duration
+    /// of a CPU cycle. A severely pipelined CPU tends to have a small `max_dist`.
+    pub(crate) max_dist: u32,
 }
 
 /// Compute topological order of nodes using BFS.
@@ -144,8 +148,24 @@ impl PropOrderBuilder {
             .filter_map(|node| self.runnable_nodes.iter().find(|(_, p)| p == node).copied())
             .collect();
 
+        let mut dist: HashMap<&String, u32> = HashMap::new();
+        for node in levels {
+            let is_unit = self.runnable_nodes.iter().any(|(is, p)| *is && p == node);
+            for from in self
+                .edges
+                .iter()
+                .filter_map(|(from, to)| (to == node).then(|| from))
+            {
+                let dist_from = dist.get(&from).copied().unwrap_or(0);
+                let dist_node = dist.entry(node).or_default();
+                *dist_node = (*dist_node).max(dist_from + is_unit as u32);
+            }
+        }
+        let max_dist = dist.values().max().copied().unwrap_or_default();
+        eprintln!("max_dist: {}", max_dist);
+
         // order
-        PropOrder { order }
+        PropOrder { order, max_dist }
     }
 }
 

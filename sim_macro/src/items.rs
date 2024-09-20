@@ -89,7 +89,7 @@ impl Parse for Case {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attr = input.call(syn::Attribute::parse_outer)?;
         let condition: expr::Expr = input.parse()?;
-        let _ = input.parse::<syn::Token![=>]>()?;
+        let _ = input.parse::<syn::Token![:]>()?;
         let value: expr::Expr = input.parse()?;
 
         let tunnel = attr.iter().find_map(|attr| {
