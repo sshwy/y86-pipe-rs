@@ -158,21 +158,22 @@ define_units! {
             inner_cc: ConditionCode
         } {
             let code = ConditionCode {
-                sf: (e >> 31 & 1) != 0,
+                sf: (e >> 63 & 1) != 0,
                 zf: e == 0,
                 of: match opfun {
                     // a, b have the same sign and a, e have different sign
-                    ADD => (!(a ^ b) & (a ^ e)) >> 31 != 0,
+                    ADD => (!(a ^ b) & (a ^ e)) >> 63 != 0,
                     // (b - a): a, b have different sign and b, e have different sign
-                    SUB => ((a ^ b) & (b ^ e)) >> 31 != 0,
+                    SUB => ((a ^ b) & (b ^ e)) >> 63 != 0,
                     _ => false
                 }
             };
             if set_cc {
                 *inner_cc = code;
+                tracing::info!("CC update: a = {:#x}, b = {:#x}, e = {:#x}, cc: {code:?}, opfun: {}", a, b, e, 
+                    crate::isa::op_code::name_of(opfun));
             }
             *cc = *inner_cc;
-            tracing::info!("CC: a = {:#x}, b = {:#x}, e = {:#x}, cc: {cc:?}", a, b, e);
         }
 
         /// Instructions like CMOVX or JX needs to check the condition code based
@@ -191,7 +192,7 @@ define_units! {
                 GE => !(sf ^ of),
                 G => !zf && !(sf ^ of),
                 _ => false
-            }
+            };
         }
 
         DataMemory dmem {
