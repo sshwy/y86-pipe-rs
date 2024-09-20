@@ -2,6 +2,13 @@ use binutils::clap::builder::styling::*;
 
 use crate::framework::MEM_SIZE;
 
+const GRAY: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
+const RED: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
+const REDB: Style = RED.bold();
+const GRN: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+const GRNB: Style = GRN.bold();
+const B: Style = Style::new().bold();
+
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {
     if let Ok(r) = s.parse() {
@@ -13,7 +20,7 @@ pub fn parse_literal(s: &str) -> Option<u64> {
     None
 }
 
-// little endian
+/// Get 64-bit unsigned integer value in little endian order.
 pub fn get_u64(binary: &[u8]) -> u64 {
     let mut res = 0;
     for (i, byte) in binary.iter().enumerate().take(8) {
@@ -21,6 +28,7 @@ pub fn get_u64(binary: &[u8]) -> u64 {
     }
     res
 }
+/// Write 64-bit unsigned integer value to binary in little endian order.
 pub fn put_u64(binary: &mut [u8], val: u64) {
     for (i, byte) in binary.iter_mut().enumerate().take(8) {
         *byte = (val >> (i * 8)) as u8;
@@ -29,14 +37,20 @@ pub fn put_u64(binary: &mut [u8], val: u64) {
 
 pub fn mem_diff(left: &[u8; MEM_SIZE], right: &[u8; MEM_SIZE]) {
     for i in 0..MEM_SIZE >> 3 {
-        if get_u64(&left[i << 3..]) != get_u64(&right[i << 3..]) {
-            print!("{:#06x}: ", i << 3,);
-            for byte in left[i << 3..].iter().take(8) {
-                print!("{:02x}", *byte)
+        let offset = i << 3;
+        if get_u64(&left[offset..]) != get_u64(&right[offset..]) {
+            let l = &left[offset..offset + 8];
+            let r = &right[offset..offset + 8];
+
+            print!("{:#06x}: ", offset);
+            for i in 0..8 {
+                let s = if l[i] != r[i] { REDB } else { GRAY };
+                print!("{s}{:02x}{s:#}", l[i])
             }
             print!(" -> ");
-            for byte in right[i << 3..].iter().take(8) {
-                print!("{:02x}", *byte)
+            for i in 0..8 {
+                let s = if l[i] != r[i] { GRNB } else { GRAY };
+                print!("{s}{:02x}{s:#}", r[i])
             }
             println!()
         }
@@ -61,37 +75,28 @@ pub fn mem_print(bin: &[u8; MEM_SIZE]) {
 
 pub fn format_ctrl(bubble: bool, stall: bool) -> String {
     if bubble {
-        let s = Style::new()
-            .bold()
-            .fg_color(Some(Color::Ansi(AnsiColor::Red)));
-        format!("{s}Bubble{s:#}")
+        format!("{REDB}Bubble{REDB:#}")
     } else if stall {
-        let s = Style::new()
-            .bold()
-            .fg_color(Some(Color::Ansi(AnsiColor::Red)));
-        format!("{s}Stall {s:#}")
+        format!("{REDB}Stall {REDB:#}")
     } else {
-        let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-        format!("{s}Normal{s:#}")
+        format!("{GRN}Normal{GRN:#}")
     }
 }
 
 pub fn format_icode(name: &str) -> String {
     if name == "NOP" {
-        let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Magenta)));
-        format!("{s}{name:6}{s:#}")
+        format!("{GRAY}{name:6}{GRAY:#}")
     } else {
         format!("{name:6}")
     }
 }
 
 pub fn format_reg_val(val: u64) -> String {
-    let s = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
     if val == 0 {
-        format!("{s}{:016x}{s:#}", 0)
+        format!("{GRAY}{:016x}{GRAY:#}", 0)
     } else {
         let num = format!("{val:x}");
         let prefix = "0".repeat(16 - num.len());
-        format!("{s}{}{s:#}{}", prefix, num)
+        format!("{GRAY}{}{GRAY:#}{B}{}{B:#}", prefix, num)
     }
 }
