@@ -6,7 +6,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     define_units,
     framework::{HardwareUnits, MemData, MEM_SIZE},
-    isa::{cond_fn::*, op_code::*, reg_code, reg_code::*, inst_code},
+    isa::{cond_fn::*, inst_code, op_code::*, reg_code, reg_code::*},
     utils::{format_reg_val, get_u64, put_u64},
 };
 
