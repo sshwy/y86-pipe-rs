@@ -6,7 +6,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     define_units,
     framework::{HardwareUnits, MemData, MEM_SIZE},
-    isa::{cond_fn::*, op_code::*, reg_code, reg_code::*},
+    isa::{cond_fn::*, op_code::*, reg_code, reg_code::*, inst_code},
     utils::{format_reg_val, get_u64, put_u64},
 };
 
@@ -73,6 +73,10 @@ define_units! {
                 *icode = icode_ifun >> 4;
                 *ifun = icode_ifun & 0xf;
                 *align = binary[pc+1..pc+10].try_into().unwrap();
+            }
+
+            if *icode == inst_code::CALL as u8 {
+                tracing::info!("CALL instruction fetched");
             }
         }
 

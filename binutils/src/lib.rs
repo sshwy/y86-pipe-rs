@@ -77,7 +77,7 @@ pub fn logging_setup(
         .with_target(false)
         .without_time()
         .with_thread_names(false)
-        .with_writer(std::io::stderr)
+        // .with_writer(std::io::stderr)
         .with_filter(filter.clone());
 
     let file_log = log_file.map(|file| {

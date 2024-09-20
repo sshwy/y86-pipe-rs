@@ -323,14 +323,23 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
             data: None,
             src,
         };
-        // if this line is not empty
+        if let Some(pair) = line.pairs.peek() {
+            // set addr for instruction or label
+            src_info.addr = Some(cur_addr);
+
+            if let Rule::label = pair.as_rule() {
+                src_info.label = Some(pair.as_str().to_string());
+                // consume this label
+                line.next();
+            }
+        }
+        // if this line has instruction
         if let Some(pair) = line.next() {
             verbo!(&pair);
-            src_info.addr = Some(cur_addr);
             let tok2 = pair.clone();
             let mut it = pair.into_iter();
             match tok2.as_rule() {
-                Rule::label => src_info.label = Some(tok2.as_str().to_string()),
+                Rule::label => bail!("unexpected label"),
                 Rule::i_single => {
                     src_info.inst = Some(match tok2.as_str() {
                         "halt" => Inst::HALT,

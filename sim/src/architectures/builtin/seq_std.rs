@@ -159,6 +159,12 @@ u64 new_pc = [
 
 impl crate::framework::PipeSim<Arch> {
     fn print_state(&self) {
+        use crate::{isa::inst_code, utils::format_icode};
+
+        println!(
+            "icode = {icode}",
+            icode = format_icode(inst_code::name_of(self.cur_inter.icode)),
+        );
         println!("{regs}", regs = self.units.print_reg())
     }
 }
