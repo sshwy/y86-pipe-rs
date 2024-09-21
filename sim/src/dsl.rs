@@ -84,7 +84,7 @@ macro_rules! define_units {
                     if new.bubble {
                         $( self.$pname = $pdefault; )*
                         if new.stall {
-                            panic!("bubble and stall at the same time")
+                            tracing::error!("bubble and stall at the same time");
                         }
                     } else if !new.stall {
                         // if not stalled, we update the output signals

@@ -132,7 +132,7 @@ fn main() -> Result<()> {
         } else {
             let mut path = std::path::PathBuf::from(&args.input);
             path.set_extension("yo");
-            path.to_str().unwrap().to_string()
+            path.to_string_lossy().to_string()
         };
         std::fs::write(&output_path, format!("{}", obj))
             .with_context(|| format!("could not write file `{}`", &output_path))?;

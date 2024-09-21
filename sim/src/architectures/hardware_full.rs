@@ -170,14 +170,15 @@ define_units! {
             .output(cc: ConditionCode)
             inner_cc: ConditionCode
         } {
+            const W_1: usize = std::mem::size_of::<u64>() * 8 - 1;
             let code = ConditionCode {
-                sf: (e >> 63 & 1) != 0,
+                sf: (e >> W_1 & 1) != 0,
                 zf: e == 0,
                 of: match opfun {
                     // a, b have the same sign and a, e have different sign
-                    ADD => (!(a ^ b) & (a ^ e)) >> 63 != 0,
+                    ADD => (!(a ^ b) & (a ^ e)) >> W_1 != 0,
                     // (b - a): a, b have different sign and b, e have different sign
-                    SUB => ((a ^ b) & (b ^ e)) >> 63 != 0,
+                    SUB => ((a ^ b) & (b ^ e)) >> W_1 != 0,
                     _ => false
                 }
             };

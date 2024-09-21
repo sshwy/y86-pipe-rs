@@ -108,8 +108,8 @@ impl From<&str> for CondFn {
     }
 }
 
-impl From<&str> for OpFn {
-    fn from(value: &str) -> Self {
+impl OpFn {
+    fn from_instname(value: &str) -> Self {
         if value.contains("andq") {
             Self::AND
         } else if value.contains("addq") {
@@ -121,15 +121,6 @@ impl From<&str> for OpFn {
         } else {
             panic!("invalid")
         }
-    }
-}
-
-impl From<u8> for OpFn {
-    fn from(value: u8) -> Self {
-        if value >= 4 {
-            panic!("invalid op")
-        }
-        unsafe { std::mem::transmute(value) }
     }
 }
 
@@ -377,14 +368,14 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                 Rule::i_opq => {
                     let reg_a = it.next_reg();
                     let reg_b = it.next_reg();
-                    let op_fn = OpFn::from(tok2.as_str());
+                    let op_fn = OpFn::from_instname(tok2.as_str());
                     src_info.inst = Some(Inst::OPQ(op_fn, reg_a, reg_b));
                     cur_addr += 2
                 }
                 Rule::i_iopq => {
                     let imm = Imm::from(it.next().unwrap());
                     let reg = it.next_reg();
-                    let op_fn = OpFn::from(tok2.as_str());
+                    let op_fn = OpFn::from_instname(tok2.as_str());
                     src_info.inst = Some(Inst::IOPQ(op_fn, imm, reg));
                 }
                 Rule::i_jx => {
