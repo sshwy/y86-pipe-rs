@@ -1,7 +1,7 @@
 const NEG_8: u64 = -8i64 as u64;
 
 sim_macro::hcl! {
-#![hardware = crate::architectures::hardware_seq]
+#![hardware = crate::architectures::hardware_seq_plus]
 #![program_counter = pc]
 #![termination = prog_term]
 #![stage_alias(S => s)]
@@ -10,13 +10,23 @@ use Stat::*;
 
 :==============================: Fetch Stage :================================:
 
-u64 pc = S.pc -> (imem.pc, pc_inc.old_pc);
+// What address should instruction be fetched at
+u64 pc = [
+    // Call.  Use instruction constant
+    S.icode == CALL : S.valc;
+    // Taken branch.  Use instruction constant
+    S.icode == JX && S.cnd : S.valc;
+    // Completion of RET instruction.  Use value from stack
+    S.icode == RET : S.valm;
+    // Default: Use incremented PC
+    1 : S.valp;
+] -> (imem.pc, pc_inc.old_pc);
 
 // Determine instruction code
 u8 icode = [
     imem.error : NOP;
     1 : imem.icode; // Default: get from instruction memory
-];
+] -> s.icode;
 
 // Determine instruction function
 u8 ifun = [
@@ -39,7 +49,8 @@ bool need_valc = icode in { IRMOVQ, RMMOVQ, MRMOVQ, JX, CALL }
 
 [u8; 9] align = imem.align -> ialign.align;
 
-u64 valp = pc_inc.new_pc;
+u64 valc = ialign.valc -> s.valc;
+u64 valp = pc_inc.new_pc -> s.valp;
 
 :=============================: Decode Stage :==============================:
 
@@ -103,7 +114,7 @@ u64 vale = alu.e -> (reg_cc.e, reg_write.vale);
 
 ConditionCode cc = reg_cc.cc -> cond.cc;
 u8 cond_fun = ifun -> cond.condfun;
-bool cnd = cond.cnd;
+bool cnd = cond.cnd -> s.cnd;
 
 :===============================: Memory Stage :===============================:
 
@@ -129,7 +140,7 @@ u64 mem_data = [
     // Default: Don't write anything
 ] -> dmem.datain;
 
-u64 valm = dmem.dataout -> reg_write.valm;
+u64 valm = dmem.dataout -> (reg_write.valm, s.valm);
 
 // Determine instruction status
 Stat stat = [
@@ -141,20 +152,6 @@ Stat stat = [
 
 bool prog_term = stat in { Hlt, Adr, Ins };
 
-:==========================: Program Counter Update :==========================:
-
-// What address should instruction be fetched at
-
-u64 new_pc = [
-    // Call.  Use instruction constant
-    icode == CALL : ialign.valc;
-    // Taken branch.  Use instruction constant
-    icode == JX && cnd : ialign.valc;
-    // Completion of RET instruction.  Use value from stack
-    icode == RET : valm;
-    // Default: Use incremented PC
-    1 : valp;
-] -> s.pc;
 }
 
 impl crate::framework::PipeSim<Arch> {

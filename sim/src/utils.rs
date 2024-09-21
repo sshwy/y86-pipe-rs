@@ -83,7 +83,8 @@ pub fn format_ctrl(bubble: bool, stall: bool) -> String {
     }
 }
 
-pub fn format_icode(name: &str) -> String {
+pub fn format_icode(icode: u8) -> String {
+    let name = crate::isa::inst_code::name_of(icode);
     if name == "NOP" {
         format!("{GRAY}{name:6}{GRAY:#}")
     } else {
