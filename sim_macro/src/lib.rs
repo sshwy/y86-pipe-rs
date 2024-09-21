@@ -509,14 +509,15 @@ impl HclData {
                 fn program_counter(&self) -> u64 {
                     self.cur_inter.#pc_name
                 }
-                /// Whether the simulation is terminated
                 fn is_terminate(&self) -> bool {
                     self.terminate
                 }
                 fn cycle_count(&self) -> u64 {
                     self.cycle_count
                 }
-                /// Get the registers and their values
+                fn cycle_cost(&self) -> u64 {
+                    self.circuit.order.max_dist as u64
+                }
                 fn registers(&self) -> Vec<(u8, u64)> {
                     use crate::framework::HardwareUnits;
                     self.units.registers()
@@ -531,7 +532,11 @@ impl HclData {
                     if self.tty_out {
                         println!(
                             "{title_style}{summary:=^80}{title_style:#}",
-                            summary = format!(" [Cycle {}] ", self.cycle_count + 1),
+                            summary = format!(
+                                " [Cycle {} (*{})] ",
+                                self.cycle_count() + 1,
+                                self.cycle_cost()
+                            ),
                         );
                     }
 
@@ -546,7 +551,9 @@ impl HclData {
                             self.program_counter(),
                         );
 
+                        // print the information of intermediate signals
                         self.print_state();
+                        println!("{}", self.units);
                     }
 
                     if self.is_terminate() {

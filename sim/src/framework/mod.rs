@@ -2,9 +2,12 @@
 //! general CPU simulator framework.
 mod propagate;
 
-pub trait HardwareUnits {
+/// HardwareUnits depends on the [`std::fmt::Display`] trait, which enables
+/// rich-text output in terminal.
+pub trait HardwareUnits: std::fmt::Display {
     /// A set of hardware units should be initialized from a given memory.
     fn init(memory: MemData) -> Self;
+
     /// Return the registers and their values.
     ///
     /// (register_code, value)
@@ -67,10 +70,18 @@ pub trait CpuSim {
     /// Whether the simulation is terminated
     fn is_terminate(&self) -> bool;
 
+    /// Get the current cycle count. Each call to [`CpuSim::propagate_signals`]
+    /// will increase the cycle count by 1.
     fn cycle_count(&self) -> u64;
+
+    /// The (time) cost of running a cycle. See
+    /// [`propagate::PropOrder::max_dist`].
+    fn cycle_cost(&self) -> u64;
+
     /// Get the registers and their values
     fn registers(&self) -> Vec<(u8, u64)>;
 
+    /// This function is called by debugger to display variables
     fn get_stage_info(&self) -> Vec<StageInfo>;
 
     // todo: remove it

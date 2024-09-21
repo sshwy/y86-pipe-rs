@@ -165,6 +165,5 @@ impl crate::framework::PipeSim<Arch> {
             "icode = {icode}",
             icode = format_icode(inst_code::name_of(self.cur_inter.icode)),
         );
-        println!("{regs}", regs = self.units.print_reg())
     }
 }

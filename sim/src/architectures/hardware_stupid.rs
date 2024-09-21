@@ -54,6 +54,13 @@ define_units! {
     }
 }
 
+impl std::fmt::Display for Units {
+    // nothing to display
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 impl HardwareUnits for Units {
     /// Init CPU harewre with given memory.
     fn init(memory: MemData) -> Self {

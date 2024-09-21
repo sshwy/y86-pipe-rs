@@ -225,6 +225,12 @@ define_units! {
     }
 }
 
+impl std::fmt::Display for Units {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{regs}\n", regs = self.fmt_reg()))
+    }
+}
+
 impl HardwareUnits for Units {
     /// Init CPU harewre with given memory.
     fn init(memory: MemData) -> Self {
@@ -259,7 +265,7 @@ impl HardwareUnits for Units {
 }
 
 impl Units {
-    pub(crate) fn print_reg(&self) -> String {
+    fn fmt_reg(&self) -> String {
         let reg_file = self.reg_read.state.borrow();
         format!(
             "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}",
