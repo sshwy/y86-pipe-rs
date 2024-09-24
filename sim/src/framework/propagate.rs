@@ -32,7 +32,7 @@ impl std::fmt::Display for PropOrder {
         writeln!(f, "propagate ordering:")?;
         let s = crate::utils::B;
         for chunk in self.order.chunk_by(|a, b| a.level == b.level) {
-            write!(f, "{s}lv.{}{s:#}:", chunk[0].level)?;
+            write!(f, "{s}lv.{}{s:#}:", chunk[0].level + 1)?;
             for item in chunk {
                 let s = if item.is_unit {
                     crate::utils::GRNB
@@ -189,7 +189,7 @@ impl PropOrderBuilder {
                 *dist_node = (*dist_node).max(dist_from + is_unit as u32);
             }
         }
-        let max_dist = dist.values().max().copied().unwrap_or_default();
+        let max_dist = dist.values().max().copied().unwrap_or_default() + 1;
         eprintln!("max_dist: {}", max_dist);
 
         let order = order

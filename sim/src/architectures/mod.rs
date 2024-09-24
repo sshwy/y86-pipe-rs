@@ -1,5 +1,4 @@
 // All hardware modules
-pub mod hardware_full;
 pub mod hardware_seq;
 pub mod hardware_stupid;
 

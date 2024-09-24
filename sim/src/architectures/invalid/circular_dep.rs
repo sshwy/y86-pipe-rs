@@ -1,5 +1,10 @@
+crate::define_stages! {
+    /// The whole cycle is a single stage.
+    SEQstage s { pc: u64 = 0 }
+}
+
 sim_macro::hcl! {
-#![hardware = crate::architectures::hardware_full]
+#![hardware = crate::architectures::hardware_seq]
 #![program_counter = a]
 #![termination = term]
 

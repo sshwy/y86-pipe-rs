@@ -21,6 +21,9 @@ use crate::{
 pub enum Stat {
     /// Indicates that everything is fine.
     Aok = 0,
+    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP
+    /// instruction. Initially, all stages are in the bubble state.
+    Bub = 1,
     /// The halt state. This state is assigned when the instruction fetcher
     /// reads the halt instruction. (If your architecture lacks a
     /// instruction fetcher, there should be some other way to specify the
