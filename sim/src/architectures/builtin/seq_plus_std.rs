@@ -1,7 +1,15 @@
 const NEG_8: u64 = -8i64 as u64;
 
+crate::define_stages! {
+    /// The whole cycle is a single stage.
+    SEQstage s {
+        icode: u8 = NOP, valc: u64 = 0, valm: u64 = 0,
+        valp: u64 = 0, cnd: bool = false
+    }
+}
+
 sim_macro::hcl! {
-#![hardware = crate::architectures::hardware_seq_plus]
+#![hardware = crate::architectures::hardware_seq]
 #![program_counter = pc]
 #![termination = prog_term]
 #![stage_alias(S => s)]

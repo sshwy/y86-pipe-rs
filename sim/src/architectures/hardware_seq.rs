@@ -4,7 +4,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    define_stages, define_units,
+    define_units,
     framework::{HardwareUnits, MemData, MEM_SIZE},
     isa::{
         cond_fn::*,
@@ -47,10 +47,6 @@ pub struct ConditionCode {
     sf: bool,
     of: bool,
     zf: bool,
-}
-define_stages! {
-    /// The whole cycle is a single stage.
-    SEQstage s { pc: u64 = 0 }
 }
 
 define_units! {
