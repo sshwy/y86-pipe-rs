@@ -14,20 +14,14 @@
 ///    of stage units will become the starting signals of the next cycle.
 #[macro_export]
 macro_rules! define_units {
-    (PipeRegs { $(
-        $(#[$stage_att:meta])*
-        $pr_name:ident $pr_short_name:ident {
-            $($(#[$pr_att:meta])* $pname:ident : $ptype:ty = $pdefault:expr),*
-        }
-    )* }
-    FunctionalUnits { $(
+    ($(
         $(#[$att:meta])*
         $unit_name:ident $unit_short_name:ident {
             $(.input( $($(#[$input_att:meta])* $iname:ident : $itype:ty),* ))?
             $(.output( $($(#[$output_att:meta])* $oname:ident : $otype:ty),* ))?
             $($sname:ident : $stype:ty),* $(,)?
         } $($body:block)?
-    )* }) => {
+    )*) => {
         /// Input signals of units
         pub mod unit_in {
             #![allow(unused_imports)]
@@ -48,69 +42,6 @@ macro_rules! define_units {
                 $($($(#[$output_att])* pub $oname: $otype, )*)?
             })*
         }
-        /// Signals stored in stage units
-        pub mod unit_stage {
-            #![allow(unused_imports)]
-            use super::*;
-            $(#[derive(Debug, Clone)]
-            #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-            $(#[$stage_att])*
-            pub struct $pr_name {
-                $(pub $pname: $ptype, )*
-                /// A special input of the pipeline register. If `bubble` is true,
-                /// during the rise edge of the clock, registers in this stage will
-                /// be reset to their default values.
-                pub bubble: bool,
-                /// If `stall` is true, the registers in this stage will keep the
-                /// same value as the previous cycle.
-                pub stall: bool,
-            }
-            impl Default for $pr_name {
-                fn default() -> Self {
-                    Self {
-                        $( $pname: $pdefault, )*
-                        bubble: false,
-                        stall: false,
-                    }
-                }
-            }
-            impl $pr_name {
-                /// Select states based on `new.bubble` and `new.stall`.
-                ///
-                /// The result is stored in `self`.
-                #[allow(unused)]
-                pub fn mux(&mut self, new: &Self) {
-                    // this block is executed at the end of the cycle
-                    if new.bubble {
-                        $( self.$pname = $pdefault; )*
-                        if new.stall {
-                            tracing::error!("bubble and stall at the same time");
-                        }
-                    } else if !new.stall {
-                        // if not stalled, we update the output signals
-                        // by its input signals computed in this cycle
-                        $( self.$pname = new.$pname; )*
-                    }
-                    // (stall) otherwise we keep the old state
-                    // the same as the previous cycle
-                }
-            })*
-        }
-
-        /// All pipeline registers (all stages).
-        #[derive(Default, Debug, Clone)]
-        pub struct PipeRegs {
-            $(pub $pr_short_name: unit_stage::$pr_name),*
-        }
-
-        impl PipeRegs {
-            /// Trigger all pipeline registers at the end of the cycle.
-            #[allow(unused)]
-            pub fn mux(&mut self, new: &PipeRegs) {
-                $( self.$pr_short_name.mux(&new.$pr_short_name); )*
-            }
-        }
-
 
         #[derive(Default, Debug, Clone)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -191,4 +122,77 @@ pub(crate) fn mtc<T: Eq>(sig: T, choice: impl AsRef<[T]>) -> bool {
         }
     }
     false
+}
+
+#[macro_export]
+macro_rules! define_stages {
+    ($(
+        $(#[$stage_att:meta])*
+        $pr_name:ident $pr_short_name:ident {
+            $($(#[$pr_att:meta])* $pname:ident : $ptype:ty = $pdefault:expr),*
+        }
+    )*) => {
+        /// Signals stored in stage units
+        pub mod unit_stage {
+            #![allow(unused_imports)]
+            use super::*;
+            $(#[derive(Debug, Clone)]
+            #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+            $(#[$stage_att])*
+            pub struct $pr_name {
+                $(pub $pname: $ptype, )*
+                /// A special input of the pipeline register. If `bubble` is true,
+                /// during the rise edge of the clock, registers in this stage will
+                /// be reset to their default values.
+                pub bubble: bool,
+                /// If `stall` is true, the registers in this stage will keep the
+                /// same value as the previous cycle.
+                pub stall: bool,
+            }
+            impl Default for $pr_name {
+                fn default() -> Self {
+                    Self {
+                        $( $pname: $pdefault, )*
+                        bubble: false,
+                        stall: false,
+                    }
+                }
+            }
+            impl $pr_name {
+                /// Select states based on `new.bubble` and `new.stall`.
+                ///
+                /// The result is stored in `self`.
+                #[allow(unused)]
+                pub fn mux(&mut self, new: &Self) {
+                    // this block is executed at the end of the cycle
+                    if new.bubble {
+                        $( self.$pname = $pdefault; )*
+                        if new.stall {
+                            tracing::error!("bubble and stall at the same time");
+                        }
+                    } else if !new.stall {
+                        // if not stalled, we update the output signals
+                        // by its input signals computed in this cycle
+                        $( self.$pname = new.$pname; )*
+                    }
+                    // (stall) otherwise we keep the old state
+                    // the same as the previous cycle
+                }
+            })*
+        }
+
+        /// All pipeline registers (all stages).
+        #[derive(Default, Debug, Clone)]
+        pub struct PipeRegs {
+            $(pub $pr_short_name: unit_stage::$pr_name),*
+        }
+
+        impl PipeRegs {
+            /// Trigger all pipeline registers at the end of the cycle.
+            #[allow(unused)]
+            pub fn mux(&mut self, new: &PipeRegs) {
+                $( self.$pr_short_name.mux(&new.$pr_short_name); )*
+            }
+        }
+    };
 }
