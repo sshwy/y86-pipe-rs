@@ -137,6 +137,8 @@ macro_rules! define_stages {
             #![allow(unused_imports)]
             use super::*;
             use crate::isa::inst_code::*;
+            use crate::isa::reg_code::*;
+            use crate::isa::op_code::*;
             $(#[derive(Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             $(#[$stage_att])*
