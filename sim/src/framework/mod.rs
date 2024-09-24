@@ -52,7 +52,10 @@ pub enum CpuStatus {
 /// through the combinational logic circuits. The signals are then latched into
 /// the pipeline registers at the end of the cycle. Therefore we can use two
 /// basic operations to simulate the pipeline.
-pub trait CpuSim {
+///
+/// Implement the [`std::fmt::Display`] trait to display architecture-specific
+/// information.
+pub trait CpuSim: std::fmt::Display {
     /// Initiate the next cycle or the first cycle. This function should be
     /// called after calling [`CpuSim::propagate_signals`]. Otherwise the
     /// behavior is undefined.

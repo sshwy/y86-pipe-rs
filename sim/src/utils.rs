@@ -2,12 +2,12 @@ use binutils::clap::builder::styling::*;
 
 use crate::framework::MEM_SIZE;
 
-const GRAY: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
-const RED: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
-const REDB: Style = RED.bold();
-const GRN: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-const GRNB: Style = GRN.bold();
-const B: Style = Style::new().bold();
+pub const GRAY: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
+pub const RED: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
+pub const REDB: Style = RED.bold();
+pub const GRN: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+pub const GRNB: Style = GRN.bold();
+pub const B: Style = Style::new().bold();
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {

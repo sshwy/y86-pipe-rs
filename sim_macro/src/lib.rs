@@ -387,13 +387,13 @@ impl HclData {
                     &mut self.cur_inter
                 );
                 let units = &mut self.units;
-                for (is_unit, name) in &self.circuit.order.order {
-                    if *is_unit {
+                for item in &self.circuit.order.order {
+                    if item.is_unit {
                         rcd.run_unit(|unit_in, unit_out| {
-                            units.run(name, (unit_in, unit_out));
+                            units.run(item.name, (unit_in, unit_out));
                         });
                     } else { // combinatorial logics do not change output (cur)
-                        rcd.run_combinatorial_logic(name);
+                        rcd.run_combinatorial_logic(item.name);
                     }
                 }
                 let (out, tracer) = rcd.finalize();
@@ -493,6 +493,11 @@ impl HclData {
 
             impl crate::framework::PipeSim<Arch> {
                 #update_fn
+            }
+            impl std::fmt::Display for crate::framework::PipeSim<Arch> {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.circuit.order)
+                }
             }
             impl crate::framework::CpuSim for crate::framework::PipeSim<Arch> {
                 fn initiate_next_cycle(&mut self) {

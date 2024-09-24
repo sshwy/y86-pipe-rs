@@ -4,7 +4,7 @@ use clap::{error::ErrorKind, CommandFactory, Parser};
 use y86_sim::{
     architectures::{arch_names, create_sim},
     assemble,
-    framework::MemData,
+    framework::{MemData, MEM_SIZE},
     mem_diff, AssembleOption,
 };
 
@@ -34,6 +34,18 @@ fn after_help() -> String {
     )
 }
 
+#[derive(clap::Args, Debug)]
+#[group(multiple = false)]
+struct Action {
+    /// Run the assembled binary in pipeline simulator
+    #[arg(short = 'R', long)]
+    run: bool,
+
+    /// Get information about the current architecture
+    #[arg(short = 'I', long)]
+    info: bool,
+}
+
 #[derive(Parser, Debug)]
 #[command(
     author,
@@ -46,7 +58,7 @@ fn after_help() -> String {
 )]
 struct Args {
     /// Path to the input .ya file
-    input: String,
+    input: Option<String>,
 
     /// Output filename (default is input%.yo)
     ///
@@ -55,13 +67,12 @@ struct Args {
     #[arg(short = 'o', long)]
     output: Option<String>,
 
+    #[clap(flatten)]
+    act: Action,
+
     /// Specify the pipeline architecture to run
     #[arg(long, default_value = "seq_std")]
     arch: Option<String>,
-
-    /// Run the assembled binary in pipeline simulator
-    #[arg(long)]
-    run: bool,
 
     /// Limit the maximum number of CPU cycles to prevent infinite loop
     #[arg(long, default_value = "100000")]
@@ -88,12 +99,27 @@ fn main() -> Result<()> {
     };
     binutils::logging_setup(log_level, None::<&std::fs::File>);
 
-    let content = std::fs::read_to_string(&args.input)
-        .with_context(|| format!("could not read file `{}`", &args.input))?;
+    let maybe_a = if let Some(input) = &args.input {
+        let content = std::fs::read_to_string(input)
+            .with_context(|| format!("could not read file `{}`", input))?;
+        let obj = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
+        Some(obj)
+    } else {
+        None
+    };
 
-    let obj = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
+    let arch = args.arch.unwrap();
+    if !arch_names().contains(&arch.as_str()) {
+        let mut cmd = Args::command();
+        cmd.error(
+            ErrorKind::InvalidValue,
+            format!("unknown architecture `{}`", arch),
+        )
+        .exit();
+    }
 
-    if args.run {
+    if args.act.run {
+        let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
         if args.output.is_some() {
             let mut cmd = Args::command();
             cmd.error(
@@ -102,16 +128,7 @@ fn main() -> Result<()> {
             )
             .exit();
         }
-        let mem = MemData::init(obj.obj.init_mem());
-        let arch = args.arch.unwrap();
-        if !arch_names().contains(&arch.as_str()) {
-            let mut cmd = Args::command();
-            cmd.error(
-                ErrorKind::InvalidValue,
-                format!("unknown architecture `{}`", arch),
-            )
-            .exit();
-        }
+        let mem = MemData::init(a.obj.init_mem());
         let mut pipe = create_sim(arch, mem.clone(), true);
 
         let max_cpu_cycle = args.max_cpu_cycle.unwrap();
@@ -124,17 +141,22 @@ fn main() -> Result<()> {
             }
         }
 
-        mem_diff(&obj.obj.init_mem(), &mem.read());
+        mem_diff(&a.obj.init_mem(), &mem.read());
         // mem_print(&pipe.mem());
+    } else if args.act.info {
+        let empty_sim = create_sim(arch, MemData::init([0; MEM_SIZE]), false);
+
+        println!("{}", empty_sim);
     } else {
+        let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
         let output_path = if let Some(path) = args.output {
             path
         } else {
-            let mut path = std::path::PathBuf::from(&args.input);
+            let mut path = std::path::PathBuf::from(&args.input.unwrap());
             path.set_extension("yo");
             path.to_string_lossy().to_string()
         };
-        std::fs::write(&output_path, format!("{}", obj))
+        std::fs::write(&output_path, format!("{}", a))
             .with_context(|| format!("could not write file `{}`", &output_path))?;
         println!("writing to file `{}`", &output_path);
     }

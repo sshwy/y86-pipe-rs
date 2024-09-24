@@ -1,10 +1,17 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    fmt::Debug,
+    fmt::{Debug, Write},
     hash::Hash,
 };
 
 use crate::framework::CpuCircuit;
+
+#[derive(Debug)]
+pub struct PropOrderItem {
+    pub is_unit: bool,
+    pub name: &'static str,
+    pub level: u32,
+}
 
 /// Vec<(is_unit, name)>.
 /// A node can be either a unit name or a intermediate signal name.
@@ -12,12 +19,32 @@ pub type NameList = Vec<(bool, &'static str)>;
 
 #[derive(Debug, Default)]
 pub struct PropOrder {
-    pub(crate) order: NameList,
+    pub(crate) order: Vec<PropOrderItem>,
     /// `max_dist` is the maximum number of hardware units in a cycle that has
     /// to be executed one after another. It is used to determine the time
     /// duration of a CPU cycle. A severely pipelined CPU tends to have a
     /// small `max_dist`.
     pub(crate) max_dist: u32,
+}
+
+impl std::fmt::Display for PropOrder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "propagate ordering:")?;
+        let s = crate::utils::B;
+        for chunk in self.order.chunk_by(|a, b| a.level == b.level) {
+            write!(f, "{s}lv.{}{s:#}:", chunk[0].level)?;
+            for item in chunk {
+                let s = if item.is_unit {
+                    crate::utils::GRNB
+                } else {
+                    crate::utils::GRAY
+                };
+                write!(f, " {s}{}{s:#}", item.name)?
+            }
+            f.write_char('\n')?;
+        }
+        Ok(())
+    }
 }
 
 /// Compute topological order of nodes using BFS.
@@ -164,6 +191,15 @@ impl PropOrderBuilder {
         }
         let max_dist = dist.values().max().copied().unwrap_or_default();
         eprintln!("max_dist: {}", max_dist);
+
+        let order = order
+            .into_iter()
+            .map(|(is_unit, p)| PropOrderItem {
+                is_unit,
+                name: p,
+                level: dist.get(&p.to_owned()).copied().unwrap_or_default(),
+            })
+            .collect();
 
         // order
         PropOrder { order, max_dist }
