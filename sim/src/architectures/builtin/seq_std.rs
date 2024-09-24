@@ -1,4 +1,4 @@
-const NEG_8: u64 = -8i64 as u64;
+use crate::architectures::hardware_seq::Stat::*;
 
 crate::define_stages! {
     /// The whole cycle is a single stage.
@@ -6,12 +6,32 @@ crate::define_stages! {
 }
 
 sim_macro::hcl! {
-#![hardware = crate::architectures::hardware_seq]
-#![program_counter = pc]
-#![termination = prog_term]
-#![stage_alias(S => s)]
 
-use Stat::*;
+// Specify the CPU hardware devices set.
+// This will imports all items from the hardware module.
+#![hardware = crate::architectures::hardware_seq]
+
+// Specify the program counter by an intermediate signal. This value is read by
+// debugger. Conventionally, when we create a breakpoint at the line of code, the
+// debugger seems to stop before executing the line of code. But in this simulator,
+// The breakpoint take effects when the current cycle is executed (so the value of pc
+// is calculated) and before the next cycle enters.
+//
+// Changing this value to other signals makes no difference to the simulation.
+// But it affects the behavior of the debugger.
+#![program_counter = pc]
+
+// Specify a boolean intermediate signal to indicate whether the program should
+// be terminated.
+#![termination = prog_term]
+
+// This attribute defines the identifiers for pipeline registers. For "F => f", the
+// identifier `f` is the short name in [`crate::define_stages`], and `F` can be
+// arbitrarily chosen.
+//
+// e.g. S.pc is the value at the start of the cycle (you should treat it as
+// read-only), s.pc is the value at the end of the cycle (you should assign to it).
+#![stage_alias(S => s)]
 
 :==============================: Fetch Stage :================================:
 

@@ -1,4 +1,4 @@
-const NEG_8: u64 = -8i64 as u64;
+use crate::architectures::hardware_seq::Stat::*;
 
 crate::define_stages! {
     /// The whole cycle is a single stage.
@@ -13,8 +13,6 @@ sim_macro::hcl! {
 #![program_counter = pc]
 #![termination = prog_term]
 #![stage_alias(S => s)]
-
-use Stat::*;
 
 :==============================: Fetch Stage :================================:
 

@@ -1,5 +1,4 @@
-//! This module defines hardware units used in the classic RISC-V seq.
-//! The units are defined using the `define_units!` macro.
+//! This module defines hardware units used in the seq architecture.
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -51,6 +50,9 @@ pub struct ConditionCode {
     of: bool,
     zf: bool,
 }
+
+/// A constant that represents the value -8.
+pub const NEG_8: u64 = -8i64 as u64;
 
 define_units! {
     InstructionMemory imem { // with split
