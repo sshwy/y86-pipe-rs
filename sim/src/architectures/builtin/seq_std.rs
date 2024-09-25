@@ -187,8 +187,9 @@ impl crate::framework::PipeSim<Arch> {
         use crate::utils::format_icode;
 
         println!(
-            "icode = {icode}",
+            "icode = {icode}, stat = {stat}",
             icode = format_icode(self.cur_inter.icode),
+            stat = self.cur_inter.stat,
         );
     }
 }

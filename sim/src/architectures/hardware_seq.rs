@@ -42,6 +42,19 @@ impl Default for Stat {
     }
 }
 
+impl std::fmt::Display for Stat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (name, s) = match self {
+            Stat::Aok => ("aok", crate::utils::GRNB),
+            Stat::Bub => ("bub", crate::utils::GRAY),
+            Stat::Hlt => ("hlt", crate::utils::GRNB),
+            Stat::Adr => ("adr", crate::utils::REDB),
+            Stat::Ins => ("ins", crate::utils::REDB),
+        };
+        write!(f, "{s}{name}{s:#}")
+    }
+}
+
 /// A data structure that simulates the condition codes.
 #[derive(Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -83,9 +96,16 @@ define_units! {
         }
     }
 
+    /// If `need_regids` is set to true, this unit will extract the register
+    /// IDs from the first byte, and valc from the rest of the bytes.
+    /// Otherwise the valc is extracted from the first 8 bytes and the last byte
+    /// is ignored.
     Align ialign {
         .input(need_regids: bool, align: [u8; 9])
-        .output(ra: u8, rb: u8, valc: u64)
+        .output(ra: u8, rb: u8,
+            /// Constant value extracted from the instruction. If the instruction
+            /// does not need a constant value, this signal is meaningless.
+            valc: u64)
     } {
         let ra_rb = align[0];
         let rest = if need_regids {
