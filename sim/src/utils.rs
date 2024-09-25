@@ -9,14 +9,17 @@ pub const GRN: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))
 pub const GRNB: Style = GRN.bold();
 pub const B: Style = Style::new().bold();
 
-/// Parse numeric literal from string in yas source efile
+/// Parse numeric literal from string in yas source file.
+/// 
+/// For decimal number, it should be a valid i64.
+/// For hexadecimal number, it should be prefixed with "0x" and in range of u64.
 pub fn parse_literal(s: &str) -> Option<u64> {
     let (sign, s) = s.strip_suffix("-").map(|s| (-1, s)).unwrap_or((1, s));
     if let Ok(r) = s.parse::<i64>() {
         return Some((r * sign) as u64);
     }
-    if let Ok(r) = i64::from_str_radix(s.strip_prefix("0x")?, 16) {
-        return Some((r * sign) as u64);
+    if let Ok(r) = u64::from_str_radix(s.strip_prefix("0x")?, 16) {
+        return Some((r as i64 * sign) as u64);
     }
     None
 }
