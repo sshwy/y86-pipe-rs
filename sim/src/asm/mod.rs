@@ -165,9 +165,10 @@ impl From<ParseInput<'_>> for Imm {
     }
 }
 
-/// Y86 instructions
+/// Y86 instruction Set.
 ///
-/// During assembling, the type of immediate can change
+/// During assembling, the type of immediate (`ImmType`) can change.
+///
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Inst<ImmType: Clone> {
@@ -198,6 +199,7 @@ impl<ImmType: Clone> Inst<ImmType> {
             OPQ(_, _, _) | CMOVX(_, _, _) | PUSHQ(_) | POPQ(_) => 2,
             JX(_, _) | CALL(_) => 9,
             IRMOVQ(_, _) | RMMOVQ(_, _) | MRMOVQ(_, _) => 10,
+            // extended instructions
             IOPQ(_, _, _) => 10,
         }
     }
@@ -217,7 +219,8 @@ impl<ImmType: Clone> Inst<ImmType> {
             Inst::RET => RET,
             Inst::PUSHQ(_) => PUSHQ,
             Inst::POPQ(_) => POPQ,
-            Inst::IOPQ(_, _, _) => todo!(),
+            // extended instructions
+            Inst::IOPQ(_, _, _) => IOPQ,
         }
     }
 }
@@ -377,6 +380,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     let reg = it.next_reg();
                     let op_fn = OpFn::from_instname(tok2.as_str());
                     src_info.inst = Some(Inst::IOPQ(op_fn, imm, reg));
+                    cur_addr += 10
                 }
                 Rule::i_jx => {
                     let cond_fn = CondFn::from(it.next_str());

@@ -11,11 +11,12 @@ pub const B: Style = Style::new().bold();
 
 /// Parse numeric literal from string in yas source efile
 pub fn parse_literal(s: &str) -> Option<u64> {
-    if let Ok(r) = s.parse() {
-        return Some(r);
+    let (sign, s) = s.strip_suffix("-").map(|s| (-1, s)).unwrap_or((1, s));
+    if let Ok(r) = s.parse::<i64>() {
+        return Some((r * sign) as u64);
     }
-    if let Ok(r) = u64::from_str_radix(s.strip_prefix("0x")?, 16) {
-        return Some(r);
+    if let Ok(r) = i64::from_str_radix(s.strip_prefix("0x")?, 16) {
+        return Some((r * sign) as u64);
     }
     None
 }

@@ -34,6 +34,8 @@ define_code! {
     RET = 0x9;
     PUSHQ = 0xa;
     POPQ = 0xb;
+    // extended instruction
+    IOPQ = 0xc;
 }
 
 define_code! {
