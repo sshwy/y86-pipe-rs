@@ -161,12 +161,5 @@ bool prog_term = stat in { Hlt, Adr, Ins };
 }
 
 impl crate::framework::PipeSim<Arch> {
-    fn print_state(&self) {
-        use crate::utils::format_icode;
-
-        println!(
-            "icode = {icode}",
-            icode = format_icode(self.cur_inter.icode),
-        );
-    }
+    fn print_state(&self) {}
 }

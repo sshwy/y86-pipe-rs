@@ -37,7 +37,5 @@ bool term = icode == 0;
 }
 
 impl crate::framework::PipeSim<Arch> {
-    fn print_state(&self) {
-        println!("icode = {}", self.cur_inter.icode,);
-    }
+    fn print_state(&self) {}
 }

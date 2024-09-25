@@ -102,7 +102,7 @@ impl LineInfo {
                         obj.binary[addr] = h2!(inst.icode(), op as u8);
                         obj.binary[addr + 1] = h2!(Reg::RNONE, rb);
                         obj.write_num_data(addr + 2, 8, v);
-                    },
+                    }
                 }
             }
             if let Some((sz, data)) = &self.data {

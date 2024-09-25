@@ -433,10 +433,30 @@ impl HclData {
                 let stage_index = sig.stage_index.unwrap_or(0);
                 let name = &sig.name;
 
+                let formatted_val = if let syn::Type::Array(_) = &sig.typ {
+                    quote! {
+                        format!("{:x?}", self.cur_inter.#name)
+                    }
+                } else if let syn::Type::Path(p) = &sig.typ {
+                    if ["u8", "u64"].into_iter().any(|t| p.path.is_ident(t)) {
+                        quote! {
+                            format!("{:#x?}", self.cur_inter.#name)
+                        }
+                    } else {
+                        quote! {
+                            format!("{:x?}", self.cur_inter.#name)
+                        }
+                    }
+                } else {
+                    quote! {
+                        format!("{:#x?}", self.cur_inter.#name)
+                    }
+                };
+
                 quote! {
                     info[#stage_index].signals.push((
                         stringify!(#name).to_string(),
-                        format!("{:#x?}", self.cur_inter.#name)
+                        #formatted_val
                     ));
                 }
             })
@@ -559,6 +579,13 @@ impl HclData {
                         // print the information of intermediate signals
                         self.print_state();
                         println!("{}", self.units);
+                        let stages = self.get_stage_info();
+                        for stage in stages {
+                            tracing::info!("{:-^70}", format!(" {} ", stage.name));
+                            for (name, val) in stage.signals {
+                                tracing::info!("{:<10} = {}", name, val);
+                            }
+                        }
                     }
 
                     if self.is_terminate() {

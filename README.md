@@ -114,6 +114,12 @@ This will print the state of the processor at each cycle to the standard output.
 ./target/debug/yars [input_file].ys --run | less
 ```
 
+To print more information you can use the `-v` option, which will display the value of each variable in each stage of the cycle:
+
+```bash
+./target/debug/yars [input_file].ys --run -v
+```
+
 We provide different architectures for the simulator. To view available architectures, you can run
 
 ```bash

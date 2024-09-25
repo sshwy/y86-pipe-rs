@@ -168,7 +168,6 @@ impl From<ParseInput<'_>> for Imm {
 /// Y86 instruction Set.
 ///
 /// During assembling, the type of immediate (`ImmType`) can change.
-///
 #[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Inst<ImmType: Clone> {

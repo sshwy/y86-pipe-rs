@@ -10,7 +10,7 @@ pub const GRNB: Style = GRN.bold();
 pub const B: Style = Style::new().bold();
 
 /// Parse numeric literal from string in yas source file.
-/// 
+///
 /// For decimal number, it should be a valid i64.
 /// For hexadecimal number, it should be prefixed with "0x" and in range of u64.
 pub fn parse_literal(s: &str) -> Option<u64> {

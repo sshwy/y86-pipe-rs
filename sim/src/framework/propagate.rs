@@ -29,7 +29,7 @@ pub struct PropOrder {
 
 impl std::fmt::Display for PropOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "propagate ordering:")?;
+        writeln!(f, "propagate order:")?;
         let s = crate::utils::B;
         for chunk in self.order.chunk_by(|a, b| a.level == b.level) {
             write!(f, "{s}lv.{}{s:#}:", chunk[0].level + 1)?;
@@ -190,7 +190,6 @@ impl PropOrderBuilder {
             }
         }
         let max_dist = dist.values().max().copied().unwrap_or_default() + 1;
-        eprintln!("max_dist: {}", max_dist);
 
         let order = order
             .into_iter()

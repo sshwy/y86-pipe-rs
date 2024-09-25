@@ -45,7 +45,7 @@ impl Default for Stat {
 impl std::fmt::Display for Stat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (name, s) = match self {
-            Stat::Aok => ("aok", crate::utils::GRNB),
+            Stat::Aok => ("aok", crate::utils::GRN),
             Stat::Bub => ("bub", crate::utils::GRAY),
             Stat::Hlt => ("hlt", crate::utils::GRNB),
             Stat::Adr => ("adr", crate::utils::REDB),
@@ -62,6 +62,20 @@ pub struct ConditionCode {
     sf: bool,
     of: bool,
     zf: bool,
+}
+
+impl std::fmt::Display for ConditionCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s_true = format!("{s}true{s:#}", s = crate::utils::GRNB);
+        let s_false = format!("{s}false{s:#}", s = crate::utils::GRAY);
+        write!(
+            f,
+            "sf {sf}  of {of}  zf {zf}",
+            sf = if self.sf { &s_true } else { &s_false },
+            of = if self.of { &s_true } else { &s_false },
+            zf = if self.zf { &s_true } else { &s_false },
+        )
+    }
 }
 
 /// A constant that represents the value -8.
@@ -290,7 +304,7 @@ impl Units {
     fn fmt_reg(&self) -> String {
         let reg_file = self.reg_read.state.borrow();
         format!(
-            "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}",
+            "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}\n",
             rax = format_reg_val(reg_file[RAX as usize]),
             rbx = format_reg_val(reg_file[RBX as usize]),
             rcx = format_reg_val(reg_file[RCX as usize]),
@@ -299,6 +313,6 @@ impl Units {
             rdi = format_reg_val(reg_file[RDI as usize]),
             rsp = format_reg_val(reg_file[RSP as usize]),
             rbp = format_reg_val(reg_file[RBP as usize]),
-        )
+        ) + &format!("{cc}", cc = self.reg_cc.inner_cc)
     }
 }
