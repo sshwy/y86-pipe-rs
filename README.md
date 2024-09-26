@@ -190,15 +190,6 @@ var_type var_name = [
 ];
 ```
 
-You can also assign a value to an input field of a unit via:
-
-```
-var_type var_name = some expression 
-    -> unit_var_name.input_field_name;
-```
-
-I know this syntax is a little bit weird, but it benefits you from which you can see the value fed into the unit in the debugger (The ydb debugger displays only the variables defined in HCL).
-
 If you still don't know how to define your architecture, read the source of builtin architectures for reference.
 
 After defining your architecture, you need to rebuild the project. The new architecture will be available via the `--arch` option.

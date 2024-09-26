@@ -1,8 +1,9 @@
 // Test single instructions in pipeline
 
+use interpolator::format;
+
 use super::SimTester;
 use crate::asm::Reg;
-use interpolator::format;
 
 #[allow(non_upper_case_globals)]
 const vals: [i64; 3] = [0x100, 0x020, 0x004];

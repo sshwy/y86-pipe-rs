@@ -18,6 +18,7 @@ impl SimTester {
             None
         }
     }
+
     fn simulate(&self, src: &str) -> anyhow::Result<Box<dyn crate::framework::CpuSim>> {
         let obj = make_obj(&src)?;
         let mem = crate::framework::MemData::init(obj.obj.init_mem());

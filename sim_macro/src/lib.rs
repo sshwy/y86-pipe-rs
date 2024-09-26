@@ -91,6 +91,8 @@ impl Parse for HclData {
         let mut use_items = Vec::new();
         let mut intermediate_signals = Vec::new();
         let mut stage_decls = Vec::new();
+        let mut set_inputs = Vec::new();
+        let mut set_stages = Vec::new();
 
         // repeatly parse the rest of the input
         loop {
@@ -103,6 +105,20 @@ impl Parse for HclData {
             } else if lookahead.peek(Token![:]) {
                 let item = input.parse::<items::StageDecl>()?;
                 stage_decls.push(item);
+            } else if lookahead.peek(Token![@]) {
+                let _ = input.parse::<Token![@]>()?;
+                let fn_name = input.parse::<syn::Ident>()?;
+                if fn_name.to_string() == "set_input" {
+                    let unit_input = input.parse::<items::ComponentInputs>()?;
+                    set_inputs.push(unit_input);
+                    let _ = input.parse::<Token![;]>()?;
+                } else if fn_name.to_string() == "set_stage" {
+                    let unit_input = input.parse::<items::ComponentInputs>()?;
+                    set_stages.push(unit_input);
+                    let _ = input.parse::<Token![;]>()?;
+                } else {
+                    panic!("unknown directive: {}", fn_name);
+                }
             } else {
                 let mut item = input.parse::<items::SignalDef>()?;
                 if !stage_decls.is_empty() {
@@ -114,6 +130,35 @@ impl Parse for HclData {
                     }
                 });
                 intermediate_signals.push(item);
+            }
+        }
+
+        for unit_input in set_inputs {
+            let uname = unit_input.name;
+            for fieldvalue in unit_input.fields {
+                let sig = intermediate_signals
+                    .iter_mut()
+                    .find(|s| s.name == fieldvalue.1)
+                    .unwrap();
+                sig.destinations.push(items::SignalDest {
+                    dest: LValue([uname.clone(), fieldvalue.0].into_iter().collect()),
+                    tunnel: None,
+                    is_stage_field: false,
+                });
+            }
+        }
+        for stage_input in set_stages {
+            let uname = stage_input.name;
+            for fieldvalue in stage_input.fields {
+                let sig = intermediate_signals
+                    .iter_mut()
+                    .find(|s| s.name == fieldvalue.1)
+                    .unwrap();
+                sig.destinations.push(items::SignalDest {
+                    dest: LValue([uname.clone(), fieldvalue.0].into_iter().collect()),
+                    tunnel: None,
+                    is_stage_field: true,
+                });
             }
         }
 

@@ -261,3 +261,35 @@ impl Parse for SignalDef {
         })
     }
 }
+
+/// a: b
+pub struct FieldAssign(pub syn::Ident, pub syn::Ident);
+
+impl Parse for FieldAssign {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let a = input.parse()?;
+        let _ = input.parse::<Token![:]>()?;
+        let b = input.parse()?;
+        Ok(Self(a, b))
+    }
+}
+
+pub struct ComponentInputs {
+    pub name: syn::Ident,
+    pub fields: Punctuated<FieldAssign, Token![,]>,
+}
+
+impl Parse for ComponentInputs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let args;
+        let _ = syn::parenthesized!(args in input);
+
+        let name = args.parse::<syn::Ident>()?;
+        let _ = args.parse::<Token![,]>()?;
+
+        let fields;
+        let _ = syn::braced!(fields in args);
+        let fields = fields.parse_terminated(FieldAssign::parse, syn::Token![,])?;
+        Ok(Self { name, fields })
+    }
+}

@@ -35,7 +35,11 @@ sim_macro::hcl! {
 
 :==============================: Fetch Stage :================================:
 
-u64 pc = S.pc -> (imem.pc, pc_inc.old_pc);
+u64 pc = S.pc;
+
+@set_input(imem, {
+    pc: pc
+});
 
 // Determine instruction code
 u8 icode = [
@@ -55,14 +59,23 @@ bool instr_valid = icode in // CMOVX is the same as RRMOVQ
 
 // Does fetched instruction require a regid byte?
 bool need_regids =
-    icode in { CMOVX, OPQ, PUSHQ, POPQ, IRMOVQ, RMMOVQ, MRMOVQ }
-    -> (pc_inc.need_regids, ialign.need_regids);
+    icode in { CMOVX, OPQ, PUSHQ, POPQ, IRMOVQ, RMMOVQ, MRMOVQ };
 
 // Does fetched instruction require a constant word?
-bool need_valc = icode in { IRMOVQ, RMMOVQ, MRMOVQ, JX, CALL }
-    -> pc_inc.need_valc;
+bool need_valc = icode in { IRMOVQ, RMMOVQ, MRMOVQ, JX, CALL };
 
-[u8; 9] align = imem.align -> ialign.align;
+@set_input(pc_inc, {
+    need_valc: need_valc,
+    need_regids: need_regids,
+    old_pc: pc,
+});
+
+[u8; 9] align = imem.align;
+
+@set_input(ialign, {
+    align: align,
+    need_regids: need_regids,
+});
 
 u64 valp = pc_inc.new_pc;
 
@@ -73,14 +86,19 @@ u8 srca = [
     icode in { CMOVX, RMMOVQ, OPQ, PUSHQ  } : ialign.ra;
     icode in { POPQ, RET } : RSP;
     1 : RNONE; // Don't need register
-] -> reg_read.srca;
+];
 
 // What register should be used as the B source?
 u8 srcb = [
     icode in { OPQ, RMMOVQ, MRMOVQ } : ialign.rb;
     icode in { PUSHQ, POPQ, CALL, RET } : RSP;
     1 : RNONE; // Don't need register
-] -> reg_read.srcb;
+];
+
+@set_input(reg_read, {
+    srca: srca,
+    srcb: srcb,
+});
 
 // What register should be used as the E destination?
 u8 dste = [
@@ -88,13 +106,13 @@ u8 dste = [
     icode in { IRMOVQ, OPQ} : ialign.rb;
     icode in { PUSHQ, POPQ, CALL, RET } : RSP;
     1 : RNONE; // Don't write any register
-] -> reg_write.dste;
+];
 
 // What register should be used as the M destination?
 u8 dstm = [
     icode in { MRMOVQ, POPQ } : ialign.ra;
     1 : RNONE; // Don't write any register
-] -> reg_write.dstm;
+];
 
 :==============================: Execute Stage :===============================:
 
@@ -105,7 +123,7 @@ u64 alua = [
     icode in { CALL, PUSHQ } : NEG_8;
     icode in { RET, POPQ } : 8;
     // Other instructions don't need ALU
-] -> (alu.a, reg_cc.a);
+];
 
 // Select input B to ALU
 u64 alub = [
@@ -113,37 +131,56 @@ u64 alub = [
               PUSHQ, RET, POPQ } : reg_read.valb;
     icode in { CMOVX, IRMOVQ } : 0;
     // Other instructions don't need ALU
-] -> (alu.b, reg_cc.b);
+];
 
 // Set the ALU function
 u8 alufun = [
     icode == OPQ : ifun;
     1 : ADD;
-] -> (alu.fun, reg_cc.opfun);
+];
+
+@set_input(alu, {
+    a: alua,
+    b: alub,
+    fun: alufun,
+});
 
 // Should the condition codes be updated?
-bool set_cc = icode in { OPQ } -> reg_cc.set_cc;
+bool set_cc = icode in { OPQ };
 
-u64 vale = alu.e -> (reg_cc.e, reg_write.vale);
+u64 vale = alu.e;
 
-ConditionCode cc = reg_cc.cc -> cond.cc;
-u8 cond_fun = ifun -> cond.condfun;
+@set_input(reg_cc, {
+    a: alua,
+    b: alub,
+    e: vale,
+    opfun: alufun,
+    set_cc: set_cc,
+});
+
+ConditionCode cc = reg_cc.cc;
+
+@set_input(cond, {
+    cc: cc,
+    condfun: ifun,
+});
+
 bool cnd = cond.cnd;
 
 :===============================: Memory Stage :===============================:
 
 // Set read control signal
-bool mem_read = icode in { MRMOVQ, POPQ, RET } -> dmem.read;
+bool mem_read = icode in { MRMOVQ, POPQ, RET };
 
 // Set write control signal
-bool mem_write = icode in { RMMOVQ, PUSHQ, CALL } -> dmem.write;
+bool mem_write = icode in { RMMOVQ, PUSHQ, CALL };
 
 // Select memory address
 u64 mem_addr = [
     icode in { RMMOVQ, PUSHQ, CALL, MRMOVQ } : vale;
     icode in { POPQ, RET } : reg_read.vala;
     // Other instructions don't need address
-] -> dmem.addr;
+];
 
 // Select memory input data
 u64 mem_data = [
@@ -152,9 +189,23 @@ u64 mem_data = [
     // Return PC
     icode == CALL : valp;
     // Default: Don't write anything
-] -> dmem.datain;
+];
 
-u64 valm = dmem.dataout -> reg_write.valm;
+@set_input(dmem, {
+    read: mem_read,
+    write: mem_write,
+    addr: mem_addr,
+    datain: mem_data,
+});
+
+u64 valm = dmem.dataout;
+
+@set_input(reg_write, {
+    dste: dste,
+    dstm: dstm,
+    valm: valm,
+    vale: vale,
+});
 
 // Determine instruction status
 Stat stat = [
@@ -179,7 +230,11 @@ u64 new_pc = [
     icode == RET : valm;
     // Default: Use incremented PC
     1 : valp;
-] -> s.pc;
+];
+
+@set_stage(s, {
+    pc: new_pc,
+});
 }
 
 impl crate::framework::PipeSim<Arch> {
