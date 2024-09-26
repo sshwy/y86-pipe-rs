@@ -42,9 +42,11 @@ pub enum Reg {
     RNONE = 0xf,
 }
 
-impl From<pest::iterators::Pair<'_, Rule>> for Reg {
-    fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
-        match value.as_str() {
+impl TryFrom<&str> for Reg {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        Ok(match value {
             "%rax" => Reg::RAX,
             "%rbx" => Reg::RBX,
             "%rcx" => Reg::RCX,
@@ -60,8 +62,14 @@ impl From<pest::iterators::Pair<'_, Rule>> for Reg {
             "%r12" => Reg::R12,
             "%r13" => Reg::R13,
             "%r14" => Reg::R14,
-            _ => panic!("invalid"),
-        }
+            _ => return Err(anyhow::anyhow!("invalid register identifier")),
+        })
+    }
+}
+
+impl From<pest::iterators::Pair<'_, Rule>> for Reg {
+    fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
+        value.as_str().try_into().unwrap()
     }
 }
 

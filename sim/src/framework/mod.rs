@@ -89,6 +89,13 @@ pub trait CpuSim: std::fmt::Display {
 
     // todo: remove it
     fn step(&mut self);
+
+    /// Get the value of a register if it exists
+    fn reg(&self, reg: crate::asm::Reg) -> Option<u64> {
+        self.registers()
+            .into_iter()
+            .find_map(|(r, v)| (r == reg as u8).then_some(v))
+    }
 }
 
 // here we use trait to collect the types

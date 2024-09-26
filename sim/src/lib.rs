@@ -4,6 +4,7 @@ mod dsl;
 pub mod framework;
 pub mod isa;
 mod object;
+pub mod test;
 mod utils;
 
 pub use asm::{assemble, AssembleOption};
