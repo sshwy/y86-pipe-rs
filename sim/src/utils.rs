@@ -105,3 +105,73 @@ pub fn format_reg_val(val: u64) -> String {
         format!("{GRAY}{}{GRAY:#}{B}{}{B:#}", prefix, num)
     }
 }
+
+pub fn render_arch_dependency_graph(
+    arch_name: &str,
+    order: &crate::framework::PropOrder,
+) -> anyhow::Result<()> {
+    use charming::{
+        element::{Color, Emphasis, EmphasisFocus},
+        series::{Sankey, SankeyNode},
+        Chart, HtmlRenderer,
+    };
+
+    fn map_name(name: &str) -> String {
+        name.replace(".", "-")
+    }
+
+    let mut nodes = order
+        .order
+        .iter()
+        .map(|o| o.name)
+        .chain(order.edges.iter().map(|e| e.0.as_str()))
+        .chain(order.edges.iter().map(|e| e.1.as_str()))
+        .map(map_name)
+        .collect::<Vec<_>>();
+
+    // dedup the nodes
+    nodes.sort();
+    nodes.dedup();
+
+    let devices_nodes = order
+        .order
+        .iter()
+        .filter_map(|o| o.is_unit.then_some(o.name))
+        .collect::<Vec<_>>();
+
+    let nodes = nodes
+        .into_iter()
+        .map(|name| {
+            let is_device = devices_nodes.contains(&name.as_str());
+            let color = if is_device {
+                Color::Value("rgba(0,0,255,0.5)".to_string())
+            } else {
+                Color::Value("rgba(255,0,0,0.5)".to_string())
+            };
+            SankeyNode::new(name).item_style(color)
+        })
+        .collect();
+
+    let links = order
+        .edges
+        .iter()
+        .map(|(from, to)| (map_name(from), map_name(to), 1))
+        .collect();
+
+    let c = Chart::new().series(
+        Sankey::new()
+            .emphasis(Emphasis::new().focus(EmphasisFocus::Adjacency))
+            .data(nodes)
+            .links(links),
+    );
+
+    let mut r = HtmlRenderer::new("Architecture Computational Dependency Graph", 1200, 800);
+    let outpath = format!("{}_dependency_graph.html", arch_name);
+    eprintln!(
+        "dependency graph visualization is generated at: {}",
+        outpath
+    );
+    r.save(&c, outpath)?;
+
+    Ok(())
+}

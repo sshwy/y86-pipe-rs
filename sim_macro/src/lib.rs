@@ -641,6 +641,10 @@ impl HclData {
                         self.initiate_next_cycle();
                     }
                 }
+
+                fn proporder(&self) -> &crate::framework::PropOrder {
+                    &self.circuit.order
+                }
             }
         }
     }

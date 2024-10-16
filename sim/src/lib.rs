@@ -9,7 +9,7 @@ mod utils;
 
 pub use asm::{assemble, AssembleOption};
 pub use object::{ObjectExt, SourceInfo};
-pub use utils::{mem_diff, mem_print};
+pub use utils::{mem_diff, mem_print, render_arch_dependency_graph};
 
 #[cfg(test)]
 mod tests {

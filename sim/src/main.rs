@@ -144,9 +144,11 @@ fn main() -> Result<()> {
         mem_diff(&a.obj.init_mem(), &mem.read());
         // mem_print(&pipe.mem());
     } else if args.act.info {
-        let empty_sim = create_sim(arch, MemData::init([0; MEM_SIZE]), false);
+        let empty_sim = create_sim(arch.clone(), MemData::init([0; MEM_SIZE]), false);
 
         println!("{}", empty_sim);
+
+        y86_sim::render_arch_dependency_graph(&arch, empty_sim.proporder())?;
     } else {
         let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
         let output_path = if let Some(path) = args.output {

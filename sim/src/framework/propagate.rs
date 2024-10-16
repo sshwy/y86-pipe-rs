@@ -25,6 +25,8 @@ pub struct PropOrder {
     /// duration of a CPU cycle. A severely pipelined CPU tends to have a
     /// small `max_dist`.
     pub(crate) max_dist: u32,
+    /// Edges of the computational graph.
+    pub(crate) edges: Vec<(String, String)>,
 }
 
 impl std::fmt::Display for PropOrder {
@@ -176,6 +178,7 @@ impl PropOrderBuilder {
             .filter_map(|node| self.runnable_nodes.iter().find(|(_, p)| p == node).copied())
             .collect();
 
+        // compute distance of each node from the source
         let mut dist: HashMap<&String, u32> = HashMap::new();
         for node in levels {
             let is_unit = self.runnable_nodes.iter().any(|(is, p)| *is && p == node);
@@ -202,7 +205,11 @@ impl PropOrderBuilder {
         order.sort_by_key(|a| a.level);
 
         // order
-        PropOrder { order, max_dist }
+        PropOrder {
+            order,
+            max_dist,
+            edges: self.edges,
+        }
     }
 }
 

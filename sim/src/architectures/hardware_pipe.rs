@@ -156,7 +156,7 @@ define_units! {
     /// 2. Read the values of the source registers `srca` and `srcb`.
     ///
     /// If the register is `RNONE`, the corresponding operation is not performed.
-    /// 
+    ///
     /// The order of first write then read is important as it prevents the
     /// structural hazard.
     RegisterFile reg_file {

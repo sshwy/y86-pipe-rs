@@ -96,6 +96,9 @@ pub trait CpuSim: std::fmt::Display {
             .into_iter()
             .find_map(|(r, v)| (r == reg as u8).then_some(v))
     }
+
+    /// Get the information of the computational graph
+    fn proporder(&self) -> &PropOrder;
 }
 
 // here we use trait to collect the types
