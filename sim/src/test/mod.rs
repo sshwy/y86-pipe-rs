@@ -1,7 +1,10 @@
 //! This module contains utilities for verifying the correctness of an
 //! architecture's implementation.
 
+mod diff;
 mod inst;
+
+use crate::framework::{CpuSim, MemData};
 
 pub struct SimTester {
     arch: String,
@@ -19,17 +22,24 @@ impl SimTester {
         }
     }
 
-    fn simulate(&self, src: &str) -> anyhow::Result<Box<dyn crate::framework::CpuSim>> {
+    /// Simulate the given source code and return the simulator and the memory
+    /// after the simulation.
+    fn simulate_arch(arch: String, src: &str) -> anyhow::Result<(Box<dyn CpuSim>, MemData)> {
         let obj = make_obj(&src)?;
-        let mem = crate::framework::MemData::init(obj.obj.init_mem());
-        let mut pipe = crate::architectures::create_sim(self.arch.clone(), mem, false);
+        let mem = MemData::init(obj.obj.init_mem());
+        let mut pipe = crate::architectures::create_sim(arch, mem.clone(), false);
         while !pipe.is_terminate() {
             pipe.step();
             if pipe.cycle_count() > 3000_000 {
                 anyhow::bail!("exceed maximum CPU cycle limit");
             }
         }
-        Ok(pipe)
+        Ok((pipe, mem))
+    }
+
+    fn simulate(&self, src: &str) -> anyhow::Result<Box<dyn CpuSim>> {
+        let r = Self::simulate_arch(self.arch.clone(), src)?;
+        Ok(r.0)
     }
 }
 

@@ -1,4 +1,4 @@
-// Test single instructions in pipeline
+//! Test single instructions in pipeline
 
 use interpolator::format;
 

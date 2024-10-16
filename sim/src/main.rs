@@ -8,6 +8,7 @@ use y86_sim::{
     mem_diff, AssembleOption,
 };
 
+/// Print architecture information after help message
 fn after_help() -> String {
     let extras = y86_sim::architectures::EXTRA_ARCH_NAMES;
     use binutils::clap::builder::styling::*;
@@ -37,7 +38,7 @@ fn after_help() -> String {
 #[derive(clap::Args, Debug)]
 #[group(multiple = false)]
 struct Action {
-    /// Run the assembled binary in pipeline simulator
+    /// Execute the assembled binary in simulator
     #[arg(short = 'R', long)]
     run: bool,
 

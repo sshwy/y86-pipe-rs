@@ -21,6 +21,7 @@ pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propa
 /// we have no place to store instructions.
 pub const MEM_SIZE: usize = 1 << 20;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct MemData(std::rc::Rc<std::cell::RefCell<[u8; MEM_SIZE]>>);
 
 impl Clone for MemData {
@@ -81,7 +82,9 @@ pub trait CpuSim: std::fmt::Display {
     /// [`propagate::PropOrder::max_dist`].
     fn cycle_cost(&self) -> u64;
 
-    /// Get the registers and their values
+    /// Get the registers and their values.
+    ///
+    /// The id of the register should be in increasing order.
     fn registers(&self) -> Vec<(u8, u64)>;
 
     /// This function is called by debugger to display variables
