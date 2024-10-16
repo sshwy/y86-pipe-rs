@@ -25,7 +25,7 @@ u64 pc = [
     // Completion of RET instruction.  Use value from stack
     S.icode == RET : S.valm;
     // Default: Use incremented PC
-    1 : S.valp;
+    true : S.valp;
 ];
 
 @set_input(imem, {
@@ -35,13 +35,13 @@ u64 pc = [
 // Determine instruction code
 u8 icode = [
     imem.error : NOP;
-    1 : imem.icode; // Default: get from instruction memory
+    true : imem.icode; // Default: get from instruction memory
 ];
 
 // Determine instruction function
 u8 ifun = [
     imem.error : 0; // set ifun to 0 if error
-    1 : imem.ifun;	// Default: get from instruction memory
+    true : imem.ifun;	// Default: get from instruction memory
 ];
 
 bool instr_valid = icode in // CMOVX is the same as RRMOVQ
@@ -77,14 +77,14 @@ u64 valp = pc_inc.new_pc;
 u8 srca = [
     icode in { CMOVX, RMMOVQ, OPQ, PUSHQ  } : ialign.ra;
     icode in { POPQ, RET } : RSP;
-    1 : RNONE; // Don't need register
+    true : RNONE; // Don't need register
 ];
 
 // What register should be used as the B source?
 u8 srcb = [
     icode in { OPQ, RMMOVQ, MRMOVQ } : ialign.rb;
     icode in { PUSHQ, POPQ, CALL, RET } : RSP;
-    1 : RNONE; // Don't need register
+    true : RNONE; // Don't need register
 ];
 
 @set_input(reg_read, {
@@ -97,13 +97,13 @@ u8 dste = [
     icode in { CMOVX } && cnd : ialign.rb;
     icode in { IRMOVQ, OPQ} : ialign.rb;
     icode in { PUSHQ, POPQ, CALL, RET } : RSP;
-    1 : RNONE; // Don't write any register
+    true : RNONE; // Don't write any register
 ];
 
 // What register should be used as the M destination?
 u8 dstm = [
     icode in { MRMOVQ, POPQ } : ialign.ra;
-    1 : RNONE; // Don't write any register
+    true : RNONE; // Don't write any register
 ];
 
 :==============================: Execute Stage :===============================:
@@ -128,7 +128,7 @@ u64 alub = [
 // Set the ALU function
 u8 alufun = [
     icode == OPQ : ifun;
-    1 : ADD;
+    true : ADD;
 ];
 
 @set_input(alu, {
@@ -204,7 +204,7 @@ Stat stat = [
     imem.error || dmem.error : Adr;
     !instr_valid : Ins;
     icode == HALT : Hlt;
-    1 : Aok;
+    true : Aok;
 ];
 
 bool prog_term = stat in { Hlt, Adr, Ins };

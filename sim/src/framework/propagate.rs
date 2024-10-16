@@ -191,14 +191,15 @@ impl PropOrderBuilder {
         }
         let max_dist = dist.values().max().copied().unwrap_or_default() + 1;
 
-        let order = order
+        let mut order = order
             .into_iter()
             .map(|(is_unit, p)| PropOrderItem {
                 is_unit,
                 name: p,
                 level: dist.get(&p.to_owned()).copied().unwrap_or_default(),
             })
-            .collect();
+            .collect::<Vec<_>>();
+        order.sort_by_key(|a| a.level);
 
         // order
         PropOrder { order, max_dist }
