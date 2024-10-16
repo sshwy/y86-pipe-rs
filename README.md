@@ -25,17 +25,18 @@ rustup default 1.81
 
 Simply execute `cargo build` to build all the binaries in the project. After running this command, a folder named `target` will be created to store the output binaries and other intermediate files. The output executables are
 
-- `target/debug/yars`: Y86-64 Assembler and Simulator
+- `target/debug/yas`: Y86-64 Assembler
+- `target/debug/ysim`: Y86-64 Simulator
 - `target/debug/ydb`: Y86-64 Debugger Server
 
-To build the release version, execute `cargo build --release`. The release version is optimized for performance. The released version executables locate in the `target/release` folder (`target/release/yars` and `target/release/ydb`).
+To build the release version, execute `cargo build --release`. The release version is optimized for performance. The released version executables locate in the `target/release` folder (`target/release/{yas,ysim,ydb}`).
 
 ## Assembler Usage
 
 To assemble a Y86-64 assembly file, execute the following command:
 
 ```bash
-./target/debug/yars [input_file].ys
+./target/debug/yas [input_file].ys
 ```
 
 The default output filename is `[input_file].yo`. You can specify the output filename by adding the `-o` option. For example, given the following y86 assembly file `swap.ys`:
@@ -69,7 +70,7 @@ nums:
 stack:
 ```
 
-By running `./target/debug/yars swap.ys`, the assembler will generate a binary file `swap.yo`:
+By running `./target/debug/yas swap.ys`, the assembler will generate a binary file `swap.yo`:
 
 ```asm
                              | # Swap nums if the former one >= the latter one
@@ -105,31 +106,31 @@ By running `./target/debug/yars swap.ys`, the assembler will generate a binary f
 To simulate a Y86-64 assembly file, execute the following command:
 
 ```bash
-./target/debug/yars [input_file].ys --run
+./target/debug/ysim [input_file].ys
 ```
 
 This will print the state of the processor at each cycle to the standard output. If you want to read tht output from start to end, you can pipe a `less` command to the output (To quit `less`, press `q`):
 
 ```bash
-./target/debug/yars [input_file].ys --run | less
+./target/debug/ysim [input_file].ys | less
 ```
 
 To print more information you can use the `-v` option, which will display the value of each variable in each stage of the cycle:
 
 ```bash
-./target/debug/yars [input_file].ys --run -v
+./target/debug/ysim [input_file].ys -v
 ```
 
 We provide different architectures for the simulator. To view available architectures, you can run
 
 ```bash
-./target/debug/yars --help
+./target/debug/ysim --help
 ```
 
 To specify an architecture, you can use the `--arch` option. For example, to run the simulator with the `seq_plus_std` architecture, you can run:
 
 ```bash
-./target/debug/yars [input_file].ys --run --arch seq_plus_std
+./target/debug/ysim [input_file].ys --arch seq_plus_std
 ```
 
 ## Code Organization and Custom Architectures

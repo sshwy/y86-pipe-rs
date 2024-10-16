@@ -61,14 +61,7 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let log_level = match args.verbose.log_level() {
-        Some(verbose::Level::Error) => &tracing::Level::INFO,
-        Some(verbose::Level::Warn) => &tracing::Level::DEBUG,
-        Some(verbose::Level::Info) => &tracing::Level::TRACE,
-        Some(verbose::Level::Debug) => &tracing::Level::TRACE,
-        Some(verbose::Level::Trace) => &tracing::Level::TRACE,
-        None => &tracing::Level::ERROR,
-    };
+    let log_level = binutils::verbose_level_to_trace(args.verbose.log_level());
     binutils::logging_setup(log_level, None::<&std::fs::File>);
 
     let arch = args.arch.unwrap();

@@ -6,12 +6,6 @@ license = "MIT"
 description = "Y86 assembler and pipeline simulator written in Rust"
 authors = ["Weiyao Huang <jy.cat@qq.com>"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[[bin]]
-name = "yars"
-path = "src/main.rs"
-
 [dependencies]
 pest = "2.7"
 pest_derive = "2.7"

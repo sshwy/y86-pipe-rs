@@ -62,13 +62,13 @@ pub fn get_styles() -> clap::builder::Styles {
 
 /// logging configuration for development
 pub fn logging_setup(
-    max_level: &'static tracing::Level,
+    max_level: tracing::Level,
     log_file: Option<impl std::io::Write + Clone + Send + 'static>,
 ) {
     use tracing_subscriber::{filter, prelude::*};
 
     let filter = filter::filter_fn(move |meta| {
-        meta.level() <= max_level // && !from_actix_session
+        *meta.level() <= max_level // && !from_actix_session
     });
 
     let terminal_log = tracing_subscriber::fmt::layer()
@@ -93,4 +93,15 @@ pub fn logging_setup(
         .with(file_log)
         .with(terminal_log)
         .init();
+}
+
+pub fn verbose_level_to_trace(level: Option<verbose::Level>) -> tracing::Level {
+    match level {
+        Some(verbose::Level::Error) => tracing::Level::WARN,
+        Some(verbose::Level::Warn) => tracing::Level::INFO,
+        Some(verbose::Level::Info) => tracing::Level::DEBUG,
+        Some(verbose::Level::Debug) => tracing::Level::TRACE,
+        Some(verbose::Level::Trace) => tracing::Level::TRACE,
+        None => tracing::Level::ERROR,
+    }
 }

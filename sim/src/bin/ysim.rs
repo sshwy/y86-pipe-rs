@@ -35,24 +35,12 @@ fn after_help() -> String {
     )
 }
 
-#[derive(clap::Args, Debug)]
-#[group(multiple = false)]
-struct Action {
-    /// Execute the assembled binary in simulator
-    #[arg(short = 'R', long)]
-    run: bool,
-
-    /// Get information about the current architecture
-    #[arg(short = 'I', long)]
-    info: bool,
-}
-
+/// Y86 pipeline simulator written in Rust
 #[derive(Parser, Debug)]
 #[command(
     author,
     version,
     after_help = after_help(),
-    about,
     long_about = None,
     styles = binutils::get_styles(),
     arg_required_else_help = true,
@@ -61,15 +49,9 @@ struct Args {
     /// Path to the input .ya file
     input: Option<String>,
 
-    /// Output filename (default is input%.yo)
-    ///
-    /// Specify this option to write the assembled results to a file. This
-    /// option is conflict with `run`.
-    #[arg(short = 'o', long)]
-    output: Option<String>,
-
-    #[clap(flatten)]
-    act: Action,
+    /// Get information about the current architecture
+    #[arg(short = 'I', long)]
+    info: bool,
 
     /// Specify the pipeline architecture to run
     #[arg(long, default_value = "seq_std")]
@@ -90,14 +72,7 @@ fn main() -> Result<()> {
         .verbose
         .log_level()
         .is_some_and(|lv| lv >= verbose::Level::Trace);
-    let log_level = match args.verbose.log_level() {
-        Some(verbose::Level::Error) => &tracing::Level::WARN,
-        Some(verbose::Level::Warn) => &tracing::Level::INFO,
-        Some(verbose::Level::Info) => &tracing::Level::DEBUG,
-        Some(verbose::Level::Debug) => &tracing::Level::TRACE,
-        Some(verbose::Level::Trace) => &tracing::Level::TRACE,
-        None => &tracing::Level::ERROR,
-    };
+    let log_level = binutils::verbose_level_to_trace(args.verbose.log_level());
     binutils::logging_setup(log_level, None::<&std::fs::File>);
 
     let maybe_a = if let Some(input) = &args.input {
@@ -119,16 +94,14 @@ fn main() -> Result<()> {
         .exit();
     }
 
-    if args.act.run {
+    if args.info {
+        let empty_sim = create_sim(arch.clone(), MemData::init([0; MEM_SIZE]), false);
+
+        println!("{}", empty_sim);
+
+        y86_sim::render_arch_dependency_graph(&arch, empty_sim.proporder())?;
+    } else {
         let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
-        if args.output.is_some() {
-            let mut cmd = Args::command();
-            cmd.error(
-                ErrorKind::ArgumentConflict,
-                "Can't both specify output and run",
-            )
-            .exit();
-        }
         let mem = MemData::init(a.obj.init_mem());
         let mut pipe = create_sim(arch, mem.clone(), true);
 
@@ -144,24 +117,6 @@ fn main() -> Result<()> {
 
         mem_diff(&a.obj.init_mem(), &mem.read());
         // mem_print(&pipe.mem());
-    } else if args.act.info {
-        let empty_sim = create_sim(arch.clone(), MemData::init([0; MEM_SIZE]), false);
-
-        println!("{}", empty_sim);
-
-        y86_sim::render_arch_dependency_graph(&arch, empty_sim.proporder())?;
-    } else {
-        let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
-        let output_path = if let Some(path) = args.output {
-            path
-        } else {
-            let mut path = std::path::PathBuf::from(&args.input.unwrap());
-            path.set_extension("yo");
-            path.to_string_lossy().to_string()
-        };
-        std::fs::write(&output_path, format!("{}", a))
-            .with_context(|| format!("could not write file `{}`", &output_path))?;
-        println!("writing to file `{}`", &output_path);
     }
     Ok(())
 }
