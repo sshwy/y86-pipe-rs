@@ -1,6 +1,7 @@
 // All hardware modules
 pub mod hardware_seq;
 pub mod hardware_stupid;
+pub mod hardware_pipe;
 
 // Architectures
 mod builtin;
