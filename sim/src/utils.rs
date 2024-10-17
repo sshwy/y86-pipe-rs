@@ -39,6 +39,14 @@ pub fn put_u64(binary: &mut [u8], val: u64) {
     }
 }
 
+/// Decode hexadecimal string to byte array.
+pub fn decode_hex(s: &str) -> Result<Vec<u8>, std::num::ParseIntError> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
+        .collect()
+}
+
 pub fn mem_diff(left: &[u8; MEM_SIZE], right: &[u8; MEM_SIZE]) {
     for i in 0..MEM_SIZE >> 3 {
         let offset = i << 3;

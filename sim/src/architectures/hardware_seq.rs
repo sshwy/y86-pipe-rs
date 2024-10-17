@@ -6,9 +6,7 @@ use crate::{
     define_units,
     framework::{HardwareUnits, MemData, MEM_SIZE},
     isa::{
-        cond_fn::*,
         inst_code,
-        op_code::*,
         reg_code::{self, *},
     },
     utils::{format_reg_val, get_u64, put_u64},
@@ -55,31 +53,9 @@ impl std::fmt::Display for Stat {
     }
 }
 
-/// A data structure that simulates the condition codes.
-#[derive(Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ConditionCode {
-    sf: bool,
-    of: bool,
-    zf: bool,
-}
-
-impl std::fmt::Display for ConditionCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s_true = format!("{s}true{s:#}", s = crate::utils::GRNB);
-        let s_false = format!("{s}false{s:#}", s = crate::utils::GRAY);
-        write!(
-            f,
-            "sf {sf}  of {of}  zf {zf}",
-            sf = if self.sf { &s_true } else { &s_false },
-            of = if self.of { &s_true } else { &s_false },
-            zf = if self.zf { &s_true } else { &s_false },
-        )
-    }
-}
-
 /// A constant that represents the value -8.
 pub const NEG_8: u64 = -8i64 as u64;
+pub use crate::isa::ConditionCode;
 
 define_units! {
     InstructionMemory imem { // with split
@@ -178,13 +154,7 @@ define_units! {
         .input(a: u64, b: u64, fun: u8)
         .output(e: u64)
     } {
-        *e = match fun {
-            ADD => b.wrapping_add(a),
-            SUB => b.wrapping_sub(a),
-            AND => b & a,
-            XOR => b ^ a,
-            _ => 0,
-        };
+        *e = crate::isa::arithmetic_compute(a, b, fun).unwrap_or(0);
     }
 
     /// Given the input and output of the ALU, this unit calculate the
@@ -194,22 +164,10 @@ define_units! {
         .output(cc: ConditionCode)
         inner_cc: ConditionCode
     } {
-        const W_1: usize = std::mem::size_of::<u64>() * 8 - 1;
-        let code = ConditionCode {
-            sf: (e >> W_1 & 1) != 0,
-            zf: e == 0,
-            of: match opfun {
-                // a, b have the same sign and a, e have different sign
-                ADD => (!(a ^ b) & (a ^ e)) >> W_1 != 0,
-                // (b - a): a, b have different sign and b, e have different sign
-                SUB => ((a ^ b) & (b ^ e)) >> W_1 != 0,
-                _ => false
-            }
-        };
         if set_cc {
-            *inner_cc = code;
-            tracing::info!("CC update: a = {:#x}, b = {:#x}, e = {:#x}, cc: {code:?}, opfun: {}", a, b, e,
-                crate::isa::op_code::name_of(opfun));
+            inner_cc.set(a, b, e, opfun);
+            tracing::info!("CC update: a = {:#x}, b = {:#x}, e = {:#x}, cc: {:?}, opfun: {}", a, b, e,
+                inner_cc, crate::isa::op_code::name_of(opfun));
         }
         *cc = *inner_cc;
     }
@@ -220,17 +178,7 @@ define_units! {
         .input(condfun: u8, cc: ConditionCode)
         .output(cnd: bool)
     } {
-        let ConditionCode {sf, zf, of} = cc;
-        *cnd = match condfun {
-            YES => true,
-            E => zf,
-            NE => !zf,
-            L => sf ^ of,
-            LE => zf || (sf ^ of),
-            GE => !(sf ^ of),
-            G => !zf && !(sf ^ of),
-            _ => false
-        };
+        *cnd = cc.test(condfun);
     }
 
     DataMemory dmem {

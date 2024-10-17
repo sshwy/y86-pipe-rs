@@ -14,7 +14,7 @@ use y86_sim::{assemble, AssembleOption};
 )]
 struct Args {
     /// Path to the input .ya file
-    input: Option<String>,
+    input: String,
 
     /// Output filename (default is input%.yo)
     ///
@@ -37,20 +37,14 @@ fn main() -> Result<()> {
     let log_level = binutils::verbose_level_to_trace(args.verbose.log_level());
     binutils::logging_setup(log_level, None::<&std::fs::File>);
 
-    let maybe_a = if let Some(input) = &args.input {
-        let content = std::fs::read_to_string(input)
-            .with_context(|| format!("could not read file `{}`", input))?;
-        let obj = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
-        Some(obj)
-    } else {
-        None
-    };
+    let content = std::fs::read_to_string(&args.input)
+        .with_context(|| format!("could not read file `{}`", args.input))?;
+    let a = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
 
-    let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
     let output_path = if let Some(path) = args.output {
         path
     } else {
-        let mut path = std::path::PathBuf::from(&args.input.unwrap());
+        let mut path = std::path::PathBuf::from(&args.input);
         path.set_extension("yo");
         path.to_string_lossy().to_string()
     };

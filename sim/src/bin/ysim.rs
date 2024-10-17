@@ -5,7 +5,7 @@ use y86_sim::{
     architectures::{arch_names, create_sim},
     assemble,
     framework::{MemData, MEM_SIZE},
-    mem_diff, AssembleOption,
+    utils, AssembleOption,
 };
 
 /// Print architecture information after help message
@@ -99,7 +99,7 @@ fn main() -> Result<()> {
 
         println!("{}", empty_sim);
 
-        y86_sim::render_arch_dependency_graph(&arch, empty_sim.proporder())?;
+        utils::render_arch_dependency_graph(&arch, empty_sim.proporder())?;
     } else {
         let a = maybe_a.ok_or(anyhow::anyhow!("no input file"))?;
         let mem = MemData::init(a.obj.init_mem());
@@ -115,7 +115,7 @@ fn main() -> Result<()> {
             }
         }
 
-        mem_diff(&a.obj.init_mem(), &mem.read());
+        utils::mem_diff(&a.obj.init_mem(), &mem.read());
         // mem_print(&pipe.mem());
     }
     Ok(())

@@ -5,11 +5,10 @@ pub mod framework;
 pub mod isa;
 mod object;
 pub mod test;
-mod utils;
+pub mod utils;
 
 pub use asm::{assemble, AssembleOption};
-pub use object::{ObjectExt, SourceInfo};
-pub use utils::{mem_diff, mem_print, render_arch_dependency_graph};
+pub use object::{ObjectExt, SourceInfo, BIN_SIZE};
 
 #[cfg(test)]
 mod tests {

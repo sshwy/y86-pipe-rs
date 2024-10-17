@@ -19,7 +19,7 @@ pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propa
 /// Size of the memory that is used to store instructions and data (stack).
 /// No matter what architecture we are using, memory store must exist. Otherwise
 /// we have no place to store instructions.
-pub const MEM_SIZE: usize = 1 << 20;
+pub const MEM_SIZE: usize = 1 << 16;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct MemData(std::rc::Rc<std::cell::RefCell<[u8; MEM_SIZE]>>);

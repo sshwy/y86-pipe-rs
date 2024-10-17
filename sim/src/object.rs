@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Maximum size of the assembled binary.
-const BIN_SIZE: usize = 1 << 16;
+pub const BIN_SIZE: usize = MEM_SIZE;
 
 type SymbolMap = BTreeMap<String, u64>;
 

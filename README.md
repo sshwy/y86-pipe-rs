@@ -26,10 +26,11 @@ rustup default 1.81
 Simply execute `cargo build` to build all the binaries in the project. After running this command, a folder named `target` will be created to store the output binaries and other intermediate files. The output executables are
 
 - `target/debug/yas`: Y86-64 Assembler
-- `target/debug/ysim`: Y86-64 Simulator
+- `target/debug/yis`: Y86-64 ISA Simulator
+- `target/debug/ysim`: Y86-64 Pipline Simulator
 - `target/debug/ydb`: Y86-64 Debugger Server
 
-To build the release version, execute `cargo build --release`. The release version is optimized for performance. The released version executables locate in the `target/release` folder (`target/release/{yas,ysim,ydb}`).
+To build the release version, execute `cargo build --release`. The release version is optimized for performance. The released version executables locate in the `target/release` folder (`target/release/{yas,yis,ysim,ydb}`).
 
 ## Assembler Usage
 
