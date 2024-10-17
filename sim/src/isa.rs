@@ -161,7 +161,8 @@ pub struct StandardResult {
     pub pc: usize,
 }
 
-/// Execute Y86 machine code w.r.t. the ISA specification.
+/// Execute Y86 machine code w.r.t. the ISA specification. This function
+/// is used to verify the correctness of the pipeline architectures.
 ///
 /// It supports the extended `iopq` instruction.
 pub fn simulate(mut bin: [u8; BIN_SIZE]) -> anyhow::Result<StandardResult> {

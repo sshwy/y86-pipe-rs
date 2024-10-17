@@ -36,11 +36,6 @@ impl SimTester {
         }
         Ok((pipe, mem))
     }
-
-    fn simulate(&self, src: &str) -> anyhow::Result<Box<dyn CpuSim>> {
-        let r = Self::simulate_arch(self.arch.clone(), src)?;
-        Ok(r.0)
-    }
 }
 
 fn make_obj(src: &str) -> anyhow::Result<crate::ObjectExt> {

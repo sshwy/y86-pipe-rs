@@ -8,10 +8,8 @@ pub trait HardwareUnits: std::fmt::Display {
     /// A set of hardware units should be initialized from a given memory.
     fn init(memory: MemData) -> Self;
 
-    /// Return the registers and their values.
-    ///
-    /// (register_code, value)
-    fn registers(&self) -> Vec<(u8, u64)>;
+    /// Return the content of register file, indexed by the register code.
+    fn register_file(&self) -> [u64; 16];
 }
 
 pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
@@ -85,7 +83,7 @@ pub trait CpuSim: std::fmt::Display {
     /// Get the registers and their values.
     ///
     /// The id of the register should be in increasing order.
-    fn registers(&self) -> Vec<(u8, u64)>;
+    fn registers(&self) -> [u64; 16];
 
     /// This function is called by debugger to display variables
     fn get_stage_info(&self) -> Vec<StageInfo>;
@@ -95,9 +93,7 @@ pub trait CpuSim: std::fmt::Display {
 
     /// Get the value of a register if it exists
     fn reg(&self, reg: crate::asm::Reg) -> Option<u64> {
-        self.registers()
-            .into_iter()
-            .find_map(|(r, v)| (r == reg as u8).then_some(v))
+        self.registers().get(reg as usize).copied()
     }
 
     /// Get the information of the computational graph

@@ -174,7 +174,9 @@ impl SourceInfo {
     }
 }
 
-/// object file with source info
+/// object file with source info.
+///
+/// To render the yo file, use `format!("{}", obj)`.
 #[derive(Default)]
 pub struct ObjectExt {
     pub obj: Object,

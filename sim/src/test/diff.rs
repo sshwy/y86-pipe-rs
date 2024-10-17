@@ -6,11 +6,12 @@ use anyhow::Context;
 use super::SimTester;
 
 impl SimTester {
-    pub fn test_compare(&self, gt_arch: String, src: &str) -> anyhow::Result<()> {
-        let (gt, gt_mem) = SimTester::simulate_arch(gt_arch, src).context("simulate gt")?;
+    pub fn test_isa(&self, src: &str) -> anyhow::Result<()> {
+        let a = super::make_obj(src).context("assemble")?;
+        let answer = crate::isa::simulate(a.obj.init_mem())?;
         let (sim, sim_mem) = SimTester::simulate_arch(self.arch.clone(), src)?;
 
-        let gt_regs = gt.registers();
+        let gt_regs = answer.regs;
         let sim_regs = sim.registers();
         if gt_regs != sim_regs {
             anyhow::bail!(
@@ -20,7 +21,7 @@ impl SimTester {
             );
         }
 
-        let gt_mem_read = gt_mem.read();
+        let gt_mem_read = answer.bin;
         let sim_mem_read = sim_mem.read();
         if gt_mem_read.as_ref() != sim_mem_read.as_ref() {
             crate::utils::mem_diff(&gt_mem_read, &sim_mem_read);

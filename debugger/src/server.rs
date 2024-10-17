@@ -299,10 +299,11 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                 let vars = if args.variables_reference == REG_SCOPE_VAR_REF {
                     let regs = inner.sim.registers();
                     regs.iter()
+                        .enumerate()
                         .map(|(reg, val)| {
                             let value = format!("{:#x}", val);
                             types::Variable {
-                                name: y86_sim::isa::reg_code::name_of(*reg).to_string(),
+                                name: y86_sim::isa::reg_code::name_of(reg as u8).to_string(),
                                 value,
                                 presentation_hint: Some(VAR_PRESENTATION_HINT),
                                 ..Default::default()

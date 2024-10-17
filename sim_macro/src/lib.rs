@@ -588,9 +588,9 @@ impl HclData {
                 fn cycle_cost(&self) -> u64 {
                     self.circuit.order.max_dist as u64
                 }
-                fn registers(&self) -> Vec<(u8, u64)> {
+                fn registers(&self) -> [u64; 16] {
                     use crate::framework::HardwareUnits;
-                    self.units.registers()
+                    self.units.register_file()
                 }
 
                 #get_stage_info_fn

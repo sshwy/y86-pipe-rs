@@ -248,15 +248,8 @@ impl HardwareUnits for Units {
         }
     }
 
-    fn registers(&self) -> Vec<(u8, u64)> {
-        self.reg_file
-            .state
-            .borrow()
-            .iter()
-            .enumerate()
-            .filter(|(id, _)| (*id as u8) != RNONE)
-            .map(|(i, &v)| (i as u8, v))
-            .collect()
+    fn register_file(&self) -> [u64; 16] {
+        self.reg_file.state.borrow().clone()
     }
 }
 

@@ -1,17 +1,21 @@
+crate::define_stages! {
+    /// The whole cycle is a single stage.
+    SEQstage s { pc: u64 = 0 }
+}
+
 sim_macro::hcl! {
 
-#![hardware = crate::architectures::hardware_stupid]
+#![hardware = crate::architectures::hardware_seq]
 #![program_counter = pc]
 #![termination = term]
-#![stage_alias(F => f)]
+#![stage_alias(S => s)]
 
-u64 pc = F.pc -> imem.pc;
-u8 icode = imem.higher;
+u64 pc = S.pc -> imem.pc;
 
 // ALU requires 3 inputs, but only 1 is provided!
-u64 alua = F.pc -> alu.a;
+u64 alua = S.pc -> alu.a;
 
-bool term = icode == 0;
+bool term = pc == 0;
 }
 
 impl crate::framework::PipeSim<Arch> {
