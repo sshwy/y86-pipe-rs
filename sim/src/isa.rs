@@ -159,6 +159,7 @@ pub struct StandardResult {
     pub cc: ConditionCode,
     pub regs: [u64; 16],
     pub pc: usize,
+    pub n_insts: u64,
 }
 
 /// Execute Y86 machine code w.r.t. the ISA specification. This function
@@ -370,5 +371,6 @@ pub fn simulate(mut bin: [u8; BIN_SIZE]) -> anyhow::Result<StandardResult> {
         cc: reg_cc,
         regs: reg_file,
         pc,
+        n_insts,
     })
 }
