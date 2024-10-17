@@ -47,7 +47,7 @@ fn main() -> Result<()> {
         }
     }
 
-    y86_sim::isa::simulate(bin)?;
+    y86_sim::isa::simulate(bin, true)?;
 
     Ok(())
 }

@@ -166,7 +166,7 @@ pub struct StandardResult {
 /// is used to verify the correctness of the pipeline architectures.
 ///
 /// It supports the extended `iopq` instruction.
-pub fn simulate(mut bin: [u8; BIN_SIZE]) -> anyhow::Result<StandardResult> {
+pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<StandardResult> {
     let original = bin.clone();
     let mut pc = 0;
 
@@ -363,8 +363,10 @@ pub fn simulate(mut bin: [u8; BIN_SIZE]) -> anyhow::Result<StandardResult> {
         }
     }
 
-    eprintln!("total instructions: {}", n_insts);
-    mem_diff(&original, &bin);
+    if tty_out {
+        eprintln!("total instructions: {}", n_insts);
+        mem_diff(&original, &bin);
+    }
 
     Ok(StandardResult {
         bin,

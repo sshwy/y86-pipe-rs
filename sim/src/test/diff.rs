@@ -3,12 +3,11 @@
 
 use anyhow::Context;
 
+use super::SimTester;
 use crate::{
     framework::{CpuSim, MemData},
     isa::StandardResult,
 };
-
-use super::SimTester;
 
 pub struct TestIsaResult {
     pub answer: StandardResult,
@@ -42,7 +41,7 @@ impl TestIsaResult {
 impl SimTester {
     pub fn test_isa(&self, src: &str) -> anyhow::Result<TestIsaResult> {
         let a = super::make_obj(src).context("assemble")?;
-        let answer = crate::isa::simulate(a.obj.init_mem())?;
+        let answer = crate::isa::simulate(a.obj.init_mem(), false)?;
         let (sim, sim_mem) = SimTester::simulate_arch(self.arch.clone(), src)?;
 
         let r = TestIsaResult {
