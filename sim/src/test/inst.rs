@@ -2,7 +2,7 @@
 
 use interpolator::format;
 
-use super::SimTester;
+use super::{diff::TestIsaResult, SimTester};
 
 #[allow(non_upper_case_globals)]
 const vals: [i64; 3] = [0x100, 0x020, 0x004];
@@ -18,7 +18,7 @@ macro_rules! interp_args {
 }
 
 impl SimTester {
-    fn test_isa_write_on_fail(&self, src: &str) -> anyhow::Result<()> {
+    fn test_isa_write_on_fail(&self, src: &str) -> anyhow::Result<TestIsaResult> {
         self.test_isa(&src).inspect_err(|_| {
             // Write the failing test case to a file
             std::fs::write("test-failure.ys", &src).unwrap();
