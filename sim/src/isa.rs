@@ -231,7 +231,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
         n_insts += 1;
         let icode = bin[pc] >> 4;
         let ifun = bin[pc] & 0xf;
-        match icode {
+        let nex_pc = match icode {
             inst_code::HALT => {
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for HALT: {:#x}", ifun);
@@ -239,22 +239,24 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 break;
             }
             inst_code::NOP => {
+                let nex_pc = pc.checked_add(1).ok_or(anyhow::anyhow!("pc overflow"))?;
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for NOP: {:#x}", ifun);
                 }
-                pc += 1;
+                nex_pc
             }
             inst_code::CMOVX => {
+                let nex_pc = pc.checked_add(2).ok_or(anyhow::anyhow!("pc overflow"))?;
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
                 let rb = ensure_reg(bin[pc + 1] & 0xf)?;
 
                 if reg_cc.test(ifun) {
                     reg_file[rb] = reg_file[ra];
                 }
-
-                pc += 2;
+                nex_pc
             }
             inst_code::IRMOVQ => {
+                let nex_pc = pc.checked_add(10).ok_or(anyhow::anyhow!("pc overflow"))?;
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for IRMOVQ: {:#x}", ifun);
                 }
@@ -268,9 +270,10 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 reg_file[rb] = v;
 
-                pc += 10;
+                nex_pc
             }
             inst_code::RMMOVQ => {
+                let nex_pc = pc.checked_add(10).ok_or(anyhow::anyhow!("pc overflow"))?;
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for RMMOVQ: {:#x}", ifun);
                 }
@@ -285,9 +288,10 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 }
                 put_u64(&mut bin[addr..(addr + 8)], reg_file[ra]);
 
-                pc += 10;
+                nex_pc
             }
             inst_code::MRMOVQ => {
+                let nex_pc = pc.checked_add(10).ok_or(anyhow::anyhow!("pc overflow"))?;
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for MRMOVQ: {:#x}", ifun);
                 }
@@ -302,9 +306,10 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 }
                 reg_file[ra] = get_u64(&mut bin[addr..(addr + 8)]);
 
-                pc += 10;
+                nex_pc
             }
             inst_code::OPQ => {
+                let nex_pc = pc.checked_add(2).ok_or(anyhow::anyhow!("pc overflow"))?;
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
                 let rb = ensure_reg(bin[pc + 1] & 0xf)?;
 
@@ -317,15 +322,16 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 reg_cc.set(va, vb, ve, ifun);
                 reg_file[rb] = ve;
 
-                pc += 2;
+                nex_pc
             }
             inst_code::JX => {
+                let nex_pc = pc.checked_add(9).ok_or(anyhow::anyhow!("pc overflow"))?;
                 let v = get_u64(&bin[(pc + 1)..(pc + 9)]);
 
                 if reg_cc.test(ifun) {
-                    pc = v as usize;
+                    v as usize
                 } else {
-                    pc += 9;
+                    nex_pc
                 }
             }
             inst_code::CALL => {
@@ -336,13 +342,13 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 let v = get_u64(&bin[(pc + 1)..(pc + 9)]);
 
                 let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
-                *rsp -= 8;
+                *rsp = rsp.checked_sub(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
                 put_u64(
                     &mut bin[(*rsp as usize)..(*rsp as usize + 8)],
                     pc as u64 + 9,
                 );
 
-                pc = v as usize;
+                v as usize
             }
             inst_code::RET => {
                 if ifun != 0 {
@@ -352,11 +358,12 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
                 let v = get_u64(&bin[(*rsp as usize)..(*rsp as usize + 8)]);
 
-                *rsp += 8;
+                *rsp = rsp.checked_add(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
 
-                pc = v as usize;
+                v as usize
             }
             inst_code::PUSHQ => {
+                let nex_pc = pc.checked_add(2).ok_or(anyhow::anyhow!("pc overflow"))?;
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for PUSHQ: {:#x}", ifun);
                 }
@@ -365,13 +372,14 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 let va = reg_file[ra];
 
                 let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
-                *rsp -= 8;
+                *rsp = rsp.checked_sub(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
                 let new_rsp = *rsp as usize;
                 put_u64(&mut bin[new_rsp..(new_rsp + 8)], va);
 
-                pc += 2;
+                nex_pc
             }
             inst_code::POPQ => {
+                let nex_pc = pc.checked_add(2).ok_or(anyhow::anyhow!("pc overflow"))?;
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for POPQ: {:#x}", ifun);
                 }
@@ -380,14 +388,15 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
                 let old_rsp = *rsp as usize;
-                *rsp += 8;
+                *rsp = rsp.checked_add(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
                 reg_file[ra] = get_u64(&bin[old_rsp..(old_rsp + 8)]);
 
-                pc += 2;
+                nex_pc
             }
             // extended instruction
             // iopq v, rb
             inst_code::IOPQ => {
+                let nex_pc = pc.checked_add(10).ok_or(anyhow::anyhow!("pc overflow"))?;
                 let ra = bin[pc + 1] >> 4;
                 if ra != reg_code::RNONE {
                     anyhow::bail!("invalid register code: {:#x}", ra);
@@ -402,10 +411,11 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 reg_cc.set(v, vb, ve, ifun);
                 reg_file[rb] = ve;
 
-                pc += 10;
+                nex_pc
             }
             _ => anyhow::bail!("unknown icode: {:#x}", icode),
-        }
+        };
+        pc = nex_pc;
     }
 
     if tty_out {
