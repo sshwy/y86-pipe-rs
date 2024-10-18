@@ -1,5 +1,7 @@
-use crate::architectures::hardware_seq::Stat::*;
-
+// This macro defines all pipeline registers in this architecture.
+// In SEQ architecture, all stages are executed in a single cycle. Thus
+// principally no pipeline registers are needed, with the exception of the
+// program counter, since we need it for instruction fetching.
 crate::define_stages! {
     /// The whole cycle is a single stage.
     SEQstage s { pc: u64 = 0 }
@@ -32,6 +34,8 @@ sim_macro::hcl! {
 // e.g. S.pc is the value at the start of the cycle (you should treat it as
 // read-only), s.pc is the value at the end of the cycle (you should assign to it).
 #![stage_alias(S => s)]
+
+use Stat::*;
 
 // You can use `:====: title :====:` to declare a section. This helps to organize
 // your code and the information displayed by debugger. It makes no difference in

@@ -1,8 +1,5 @@
-use crate::architectures::hardware_pipe::Stat::*;
-
+// This macro defines all pipeline registers in this architecture.
 crate::define_stages! {
-    /// Fetch stage registers.
-    /// note that it's not possible to bubble (see hcl)
     Fstage f {
         pred_pc: u64 = 0
     }
@@ -15,7 +12,6 @@ crate::define_stages! {
         vala: u64 = 0, valb: u64 = 0, valc: u64 = 0, dste: u8 = RNONE,
         dstm: u8 = RNONE, srca: u8 = RNONE, srcb: u8 = RNONE
     }
-    /// Memory Access Stage
     Mstage m {
         stat: Stat = Bub, icode: u8 = NOP, cnd: bool = false,
         vale: u64 = 0, vala: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE
@@ -53,6 +49,8 @@ sim_macro::hcl! {
 // e.g. M.vala is the value at the start of the cycle (you should treat it as
 // read-only), m.vala is the value at the end of the cycle (you should assign to it).
 #![stage_alias(F => f, D => d, E => e, M => m, W => w)]
+
+use Stat::*;
 
 // You can use `:====: title :====:` to declare a section. This helps to organize
 // your code and the information displayed by debugger. It makes no difference in

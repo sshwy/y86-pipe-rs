@@ -1,5 +1,7 @@
-use crate::architectures::hardware_seq::Stat::*;
-
+// This macro defines all pipeline registers in this architecture.
+// In SEQ+ architecture, all stages are executed in a single cycle. But this
+// time we need more information from the last cycle to compute the pc value
+// compared to the SEQ architecture.
 crate::define_stages! {
     /// The whole cycle is a single stage.
     SEQstage s {
@@ -13,6 +15,8 @@ sim_macro::hcl! {
 #![program_counter = pc]
 #![termination = prog_term]
 #![stage_alias(S => s)]
+
+use Stat::*;
 
 :==============================: Fetch Stage :================================:
 
