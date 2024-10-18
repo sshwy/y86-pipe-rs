@@ -1,6 +1,7 @@
 //! Builtin architectures
 pub mod seq_plus_std;
 pub mod seq_std;
+pub mod pipe_std;
 
 #[cfg(test)]
 mod tests {

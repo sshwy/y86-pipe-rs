@@ -54,7 +54,7 @@ struct Args {
     info: bool,
 
     /// Specify the pipeline architecture to run
-    #[arg(long, default_value = "seq_std")]
+    #[arg(short = 'A', long, default_value = "seq_std")]
     arch: Option<String>,
 
     /// Limit the maximum number of CPU cycles to prevent infinite loop

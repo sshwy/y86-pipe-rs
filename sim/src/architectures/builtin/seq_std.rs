@@ -33,6 +33,9 @@ sim_macro::hcl! {
 // read-only), s.pc is the value at the end of the cycle (you should assign to it).
 #![stage_alias(S => s)]
 
+// You can use `:====: title :====:` to declare a section. This helps to organize
+// your code and the information displayed by debugger. It makes no difference in
+// the simulation. That means it does not alter the evaluation order of CPU cycle.
 :==============================: Fetch Stage :================================:
 
 u64 pc = S.pc;
