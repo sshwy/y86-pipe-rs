@@ -274,13 +274,21 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
             };
         }
 
+        macro_rules! print_end {
+            () => {
+                if tty_out {
+                    println!();
+                }
+            };
+        }
+
         let nex_pc = match icode {
             inst_code::HALT => {
                 if ifun != 0 {
                     anyhow::bail!("invalid ifun for HALT: {:#x}", ifun);
                 }
                 print_inst!();
-                println!();
+                print_end!();
                 break;
             }
             inst_code::NOP => {
@@ -289,7 +297,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                     anyhow::bail!("invalid ifun for NOP: {:#x}", ifun);
                 }
                 print_inst!();
-                println!();
+                print_end!();
                 nex_pc
             }
             inst_code::CMOVX => {
@@ -299,7 +307,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 print_inst!();
                 print_reg!();
-                println!();
+                print_end!();
 
                 if reg_cc.test(ifun) {
                     reg_file[rb] = reg_file[ra];
@@ -322,7 +330,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 print_inst!();
                 print_reg!();
                 print_v!(v);
-                println!();
+                print_end!();
 
                 reg_file[rb] = v;
 
@@ -336,7 +344,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 print_inst!();
                 print_reg!();
-                println!();
+                print_end!();
 
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
                 let rb = ensure_reg(bin[pc + 1] & 0xf)?;
@@ -357,7 +365,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 }
                 print_inst!();
                 print_reg!();
-                println!();
+                print_end!();
 
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
                 let rb = ensure_reg(bin[pc + 1] & 0xf)?;
@@ -377,7 +385,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 let rb = ensure_reg(bin[pc + 1] & 0xf)?;
                 print_inst!();
                 print_reg!();
-                println!();
+                print_end!();
 
                 let va = reg_file[ra];
                 let vb = reg_file[rb];
@@ -396,7 +404,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 print_inst!();
                 print_v!(v);
-                println!();
+                print_end!();
 
                 if reg_cc.test(ifun) {
                     v as usize
@@ -413,7 +421,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 print_inst!();
                 print_v!(v);
-                println!();
+                print_end!();
 
                 let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
                 *rsp = rsp.checked_sub(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
@@ -429,7 +437,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                     anyhow::bail!("invalid ifun for RET: {:#x}", ifun);
                 }
                 print_inst!();
-                println!();
+                print_end!();
 
                 let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
                 let v = get_u64(&bin[(*rsp as usize)..(*rsp as usize + 8)]);
@@ -445,7 +453,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 }
                 print_inst!();
                 print_reg!();
-                println!();
+                print_end!();
 
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
                 let va = reg_file[ra];
@@ -464,7 +472,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 }
                 print_inst!();
                 print_reg!();
-                println!();
+                print_end!();
 
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
 
@@ -490,7 +498,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 print_inst!();
                 print_reg!();
                 print_v!(v);
-                println!();
+                print_end!();
 
                 let Some(ve) = arithmetic_compute(v, vb, ifun) else {
                     anyhow::bail!("invalid ifun for IOPQ: {:#x}", ifun);
