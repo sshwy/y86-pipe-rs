@@ -5,7 +5,7 @@ comments   =  _{ "#" ~ (!NEWLINE ~ ANY)* }
 spaced_comma = _{ whitespace* ~ "," ~ whitespace* }
 
 /// numeric values (decimal and hexical)
-num = { "-"? ~ ("0x" ~ ('0' .. '9' | 'a' .. 'f')+ | ('0'..'9')+) }
+num = { "-"? ~ ("0x" ~ ('0' .. '9' | 'a' .. 'f' | 'A' .. 'F')+ | ('0'..'9')+) }
 
 /// immediate values (decimal and hexical)
 imm = { "$" ~ num }
