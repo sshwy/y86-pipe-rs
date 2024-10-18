@@ -108,6 +108,13 @@ pub struct ConditionCode {
     pub zf: bool,
 }
 
+/// Default value of the condition code.
+pub const CC_INIT: ConditionCode = ConditionCode {
+    sf: false,
+    of: false,
+    zf: false,
+};
+
 impl ConditionCode {
     /// Test if the condition code satisfies the given condition function.
     pub fn test(self, cfn: u8) -> bool {

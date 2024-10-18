@@ -117,7 +117,7 @@ pub fn format_reg_file(reg_file: RegFile) -> String {
 
     use crate::isa::reg_code::*;
     format!(
-        "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}\n",
+        "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}",
         rax = format_reg_val(reg_file[RAX as usize]),
         rbx = format_reg_val(reg_file[RBX as usize]),
         rcx = format_reg_val(reg_file[RCX as usize]),

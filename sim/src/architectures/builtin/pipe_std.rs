@@ -10,9 +10,9 @@ crate::define_stages! {
     }
     ExecuteStage e {
         stat: Stat = Bub, icode: u8 = NOP, ifun: u8 = 0,
-        valc: u64 = 0, 
-        vala: u64 = 0, valb: u64 = 0, 
-        dste: u8 = RNONE, dstm: u8 = RNONE, 
+        valc: u64 = 0,
+        vala: u64 = 0, valb: u64 = 0,
+        dste: u8 = RNONE, dstm: u8 = RNONE,
         srca: u8 = RNONE, srcb: u8 = RNONE
     }
     /// Memory Access Stage
@@ -451,7 +451,6 @@ bool w_bubble = false;
 mod nofmt {
     use crate::framework::PipeSim;
 
-    use crate::isa::reg_code;
     use crate::utils::{format_ctrl, format_icode};
 
     use super::*;
@@ -459,7 +458,6 @@ mod nofmt {
         // print state at the beginning of a cycle
         pub fn print_state(&self) {
             // For stage registers, outputs contains information for the following cycle
-            let c = &self.cur_inter;
 
             #[allow(non_snake_case)]
             let PipeRegs {
@@ -474,8 +472,7 @@ mod nofmt {
             println!(
                 r#"Stat    F {fstat}    D {dstat}    E {estat}    M {mstat}    W {wstat}
 icode   f {ficode} D {dicode} E {eicode} M {micode} W {wicode}
-Control F {fctrl:6} D {dctrl:6} E {ectrl:6} M {mctrl:6} W {wctrl:6}
-e_dste {e_dste} D_ra {d_ra} D_rb {d_rb}"#,
+Control F {fctrl:6} D {dctrl:6} E {ectrl:6} M {mctrl:6} W {wctrl:6}"#,
                 fstat = Aok,
                 dstat = D.stat,
                 estat = E.stat,
@@ -496,9 +493,6 @@ e_dste {e_dste} D_ra {d_ra} D_rb {d_rb}"#,
                 eicode = format_icode(E.icode),
                 micode = format_icode(M.icode),
                 wicode = format_icode(W.icode),
-                e_dste = reg_code::name_of(c.e_dste),
-                d_ra = reg_code::name_of(D.ra),
-                d_rb = reg_code::name_of(D.rb),
             );
         }
     }

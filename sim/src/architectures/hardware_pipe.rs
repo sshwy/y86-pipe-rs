@@ -18,7 +18,7 @@ use crate::{
 
 /// A constant that represents the value -8.
 pub const NEG_8: u64 = -8i64 as u64;
-pub use crate::isa::{ConditionCode, Stat};
+pub use crate::isa::{ConditionCode, Stat, CC_INIT};
 
 define_units! {
     InstructionMemory imem { // with split
