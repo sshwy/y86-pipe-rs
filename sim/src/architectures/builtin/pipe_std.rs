@@ -449,11 +449,11 @@ bool w_bubble = false;
 }
 
 mod nofmt {
-    use crate::framework::PipeSim;
-
-    use crate::utils::{format_ctrl, format_icode};
-
     use super::*;
+    use crate::{
+        framework::PipeSim,
+        utils::{format_ctrl, format_icode},
+    };
     impl PipeSim<Arch> {
         // print state at the beginning of a cycle
         pub fn print_state(&self) {

@@ -21,9 +21,9 @@ pub type NameList = Vec<(bool, &'static str)>;
 pub struct PropOrder {
     pub(crate) order: Vec<PropOrderItem>,
     /// `max_dist` is the maximum number of hardware units in a cycle that has
-    /// to be executed one after another. It is used to determine the time
-    /// duration of a CPU cycle. A severely pipelined CPU tends to have a
-    /// small `max_dist`.
+    /// to be executed one after another. i.e. the length of the critical path.
+    /// It is used to determine the CPU clock time. A severely pipelined CPU
+    /// tends to have a small `max_dist`.
     pub(crate) max_dist: u32,
     /// Edges of the computational graph.
     pub(crate) edges: Vec<(String, String)>,

@@ -90,7 +90,6 @@ pub trait CpuSim: std::fmt::Display {
     /// This function is called by debugger to display variables
     fn get_stage_info(&self) -> Vec<StageInfo>;
 
-    // todo: remove it
     fn step(&mut self);
 
     /// Get the value of a register if it exists

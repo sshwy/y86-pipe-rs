@@ -102,9 +102,38 @@ By running `./target/debug/yas swap.ys`, the assembler will generate a binary fi
 0x0200:                      | stack:
                              | 
 ```
-## Simulator Usage
 
-To simulate a Y86-64 assembly file, execute the following command:
+## ISA Simulator Usage
+
+To simulate a Y86-64 assembly file w.r.t. the Y86 ISA specification, you can execute the following command:
+
+```bash
+./target/debug/yis [input_file].yo
+```
+
+For example, by running `./target/debug/yis swap.yo`, the simulator will print the following information:
+
+```
+0x0000  icode: 0x3 (IRMOVQ), ifun: 0, rA: RNONE, rB: RSP, V: 0x200
+0x000a  icode: 0x3 (IRMOVQ), ifun: 0, rA: RNONE, rB: RDI, V: 0x50
+0x0014  icode: 0x5 (MRMOVQ), ifun: 0, rA: RDX, rB: RDI
+0x001e  icode: 0x5 (MRMOVQ), ifun: 0, rA: RCX, rB: RDI
+0x0028  icode: 0x2 (CMOVX), ifun: 0, rA: RDX, rB: RBP
+0x002a  icode: 0x6 (OPQ), ifun: 1, rA: RCX, rB: RBP
+0x002c  icode: 0x7 (JX), ifun: 1, V: 0x49
+0x0035  icode: 0x4 (RMMOVQ), ifun: 0, rA: RDX, rB: RDI
+0x003f  icode: 0x4 (RMMOVQ), ifun: 0, rA: RCX, rB: RDI
+0x0049  icode: 0x0 (HALT), ifun: 0
+
+total instructions: 10
+ax 0000000000000000 bx 0000000000000000 cx 0000000000000bca dx 0000000000000cba
+si 0000000000000000 di 0000000000000050 sp 0000000000000200 bp 00000000000000f00x0050: ba0c000000000000 -> ca0b000000000000
+0x0058: ca0b000000000000 -> ba0c000000000000
+```
+
+## Pipeline Simulator Usage
+
+To simulate a Y86-64 assembly file over the default architecture (`seq_std`), execute the following command:
 
 ```bash
 ./target/debug/ysim [input_file].ys
@@ -116,7 +145,7 @@ This will print the state of the processor at each cycle to the standard output.
 ./target/debug/ysim [input_file].ys | less
 ```
 
-To print more information you can use the `-v` option, which will display the value of each variable in each stage of the cycle:
+To print more information you can use the `-v` option, which will display the value of each signal in each stage of the cycle:
 
 ```bash
 ./target/debug/ysim [input_file].ys -v
@@ -134,64 +163,6 @@ To specify an architecture, you can use the `--arch` option. For example, to run
 ./target/debug/ysim [input_file].ys --arch seq_plus_std
 ```
 
-## Code Organization and Custom Architectures
+## HCL-rs Specification
 
-By default we simulate the `seq` architecture. For a processor architecture, we define its hardware components using the `define_units` macro in the `sim/src/architectures/hardware_seq.rs` module. Its functionality is implemented in Rust. 
-
-We use Rust macros to parse the HCL that defines the architecture of the Y86-64 processor. Therefore you can define your own architecture without writing even a single line of Rust code!
-
-However, the original HCL does not declare the relation of the variables and CPU hardware devices inputs clearly. To address this ambiguity, we modify the HCL syntax to unvail these information.
-
-Besides, it is important to remember some basic types in Rust to define variables in the HCL macro block. The Rust basic types used in HCL and their corresponding equivalent C/C++ types are:
-
-| Rust Type | C/C++ Type           |
-|-----------|----------------------|
-| `u8`      | `unsigned char`      |
-| `u64`     | `unsigned long long` |
-| `bool`    | `bool` (in C++)      |
-
-There are some other data structures. You can inspect their definition in `sim/src/isa.rs` (The syntax of Rust is similar to C/C++, so you can easily understand the code):
-
-
-| Rust Type       |  Description                     |
-|-----------------|----------------------------------|
-| `ConditionCode` | Flags stored in the cc register. |
-| `Stat`          | Status of the stage.             |
-
-We also exported a useful constant `NEG_8` to represent `-8` in 64-bit (`0xFFFFFFFFFFFFFFF8`) to improve the readability of the HCL code.
-
-To define your custom architecture, create a new `.rs` file in the `sim/src/architectures/extra` folder. The name of the file (do not include blank characters in the file name) will become the name of your architecture.
-
-The hardware module you choose exports those units defined in the `define_units` macro as:
-
-
-```
-define_units! {
-    UnitName unit_var_name {
-        .input(
-            input_field_name: filed_type,
-            ...
-        )
-        .output(
-            output_field_name: filed_type,
-            ...
-        )
-    }
-}
-```
-
-Then in your HCL macro block, you can read the output of a unit via:
-
-```
-var_type var_name = unit_var_name.output_field_name;
-
-// or
-
-var_type var_name = [
-    some condition: unit_var_name.output_field_name;
-];
-```
-
-If you still don't know how to define your architecture, read the source of builtin architectures for reference.
-
-After defining your architecture, you need to rebuild the project. The new architecture will be available via the `--arch` option.
+Please refer to this [attachment](assets/hcl-rs.pdf) for detailed description of the HCL-rs syntax.
