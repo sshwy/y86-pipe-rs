@@ -2,6 +2,10 @@
 //! general CPU simulator framework.
 mod propagate;
 
+pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
+
+use crate::isa::RegFile;
+
 /// HardwareUnits depends on the [`std::fmt::Display`] trait, which enables
 /// rich-text output in terminal.
 pub trait HardwareUnits: std::fmt::Display {
@@ -9,10 +13,8 @@ pub trait HardwareUnits: std::fmt::Display {
     fn init(memory: MemData) -> Self;
 
     /// Return the content of register file, indexed by the register code.
-    fn register_file(&self) -> [u64; 16];
+    fn register_file(&self) -> RegFile;
 }
-
-pub use propagate::{PropCircuit, PropOrder, PropOrderBuilder, PropUpdates, Propagator, Tracer};
 
 /// Size of the memory that is used to store instructions and data (stack).
 /// No matter what architecture we are using, memory store must exist. Otherwise
@@ -83,7 +85,7 @@ pub trait CpuSim: std::fmt::Display {
     /// Get the registers and their values.
     ///
     /// The id of the register should be in increasing order.
-    fn registers(&self) -> [u64; 16];
+    fn registers(&self) -> RegFile;
 
     /// This function is called by debugger to display variables
     fn get_stage_info(&self) -> Vec<StageInfo>;

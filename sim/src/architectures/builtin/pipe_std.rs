@@ -1,22 +1,27 @@
 // This macro defines all pipeline registers in this architecture.
 crate::define_stages! {
-    Fstage f {
+    FetchStage f {
         pred_pc: u64 = 0
     }
-    Dstage d {
+    DecodeStage d {
         stat: Stat = Bub, icode: u8 = NOP, ifun: u8 = 0,
-        ra: u8 = RNONE, rb: u8 = RNONE, valc: u64 = 0, valp: u64 = 0
+        ra: u8 = RNONE, rb: u8 = RNONE,
+        valc: u64 = 0, valp: u64 = 0
     }
-    Estage e {
+    ExecuteStage e {
         stat: Stat = Bub, icode: u8 = NOP, ifun: u8 = 0,
-        vala: u64 = 0, valb: u64 = 0, valc: u64 = 0, dste: u8 = RNONE,
-        dstm: u8 = RNONE, srca: u8 = RNONE, srcb: u8 = RNONE
+        valc: u64 = 0, 
+        vala: u64 = 0, valb: u64 = 0, 
+        dste: u8 = RNONE, dstm: u8 = RNONE, 
+        srca: u8 = RNONE, srcb: u8 = RNONE
     }
-    Mstage m {
+    /// Memory Access Stage
+    MemoryStage m {
         stat: Stat = Bub, icode: u8 = NOP, cnd: bool = false,
-        vale: u64 = 0, vala: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE
+        vale: u64 = 0, vala: u64 = 0,
+        dste: u8 = RNONE, dstm: u8 = RNONE
     }
-    Wstage w {
+    WritebackStage w {
         stat: Stat = Bub, icode: u8 = NOP, vale: u64 = 0,
         valm: u64 = 0, dste: u8 = RNONE, dstm: u8 = RNONE
     }
@@ -171,15 +176,6 @@ u8 d_dstm = [
     1 : RNONE; // Don't write any register
 ];
 
-@set_input(reg_file, {
-    srca: d_srca,
-    srcb: d_srcb,
-    dste: w_dste,
-    dstm: w_dstm,
-    valm: w_valm,
-    vale: w_vale,
-});
-
 u64 d_rvala = reg_file.vala;
 u64 d_rvalb = reg_file.valb;
 
@@ -235,7 +231,6 @@ u64 alua = [
 
 // Select input B to ALU
 u64 alub = [
-
     E.icode in { RMMOVQ, MRMOVQ, OPQ, CALL, PUSHQ, RET, POPQ } : E.valb;
     E.icode in { CMOVX, IRMOVQ } : 0;
     1 : 0; // Other instructions don't need ALU
@@ -361,6 +356,15 @@ u8 w_dstm = W.dstm;
 
 // Set M port value
 u64 w_valm = W.valm;
+
+@set_input(reg_file, {
+    srca: d_srca,
+    srcb: d_srcb,
+    dste: w_dste,
+    dstm: w_dstm,
+    valm: w_valm,
+    vale: w_vale,
+});
 
 // Update processor status (used for outside monitoring)
 Stat prog_stat = [

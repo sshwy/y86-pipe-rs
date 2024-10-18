@@ -1,6 +1,6 @@
 use binutils::clap::builder::styling::*;
 
-use crate::framework::MEM_SIZE;
+use crate::{framework::MEM_SIZE, isa::RegFile};
 
 pub const GRAY: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack)));
 pub const RED: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
@@ -104,14 +104,29 @@ pub fn format_icode(icode: u8) -> String {
     }
 }
 
-pub fn format_reg_val(val: u64) -> String {
-    if val == 0 {
-        format!("{GRAY}{:016x}{GRAY:#}", 0)
-    } else {
-        let num = format!("{val:x}");
-        let prefix = "0".repeat(16 - num.len());
-        format!("{GRAY}{}{GRAY:#}{B}{}{B:#}", prefix, num)
+pub fn format_reg_file(reg_file: RegFile) -> String {
+    fn format_reg_val(val: u64) -> String {
+        if val == 0 {
+            format!("{GRAY}{:016x}{GRAY:#}", 0)
+        } else {
+            let num = format!("{val:x}");
+            let prefix = "0".repeat(16 - num.len());
+            format!("{GRAY}{}{GRAY:#}{B}{}{B:#}", prefix, num)
+        }
     }
+
+    use crate::isa::reg_code::*;
+    format!(
+        "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}\n",
+        rax = format_reg_val(reg_file[RAX as usize]),
+        rbx = format_reg_val(reg_file[RBX as usize]),
+        rcx = format_reg_val(reg_file[RCX as usize]),
+        rdx = format_reg_val(reg_file[RDX as usize]),
+        rsi = format_reg_val(reg_file[RSI as usize]),
+        rdi = format_reg_val(reg_file[RDI as usize]),
+        rsp = format_reg_val(reg_file[RSP as usize]),
+        rbp = format_reg_val(reg_file[RBP as usize]),
+    )
 }
 
 pub fn render_arch_dependency_graph(

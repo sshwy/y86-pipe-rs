@@ -64,6 +64,9 @@ define_code! {
     RNONE = 0xf;
 }
 
+/// we use a 64-bit integer array of length 16 to represent the register file.
+pub type RegFile = [u64; 16];
+
 define_code! {
     @mod op_code;
     @type u8;
@@ -153,11 +156,52 @@ impl std::fmt::Display for ConditionCode {
     }
 }
 
+/// Simulator State (at each stage), depending on the hardware design.
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum Stat {
+    /// Indicates that everything is fine.
+    Aok = 0,
+    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP
+    /// instruction. Initially, all stages are in the bubble state.
+    Bub = 1,
+    /// The halt state. This state is assigned when the instruction fetcher
+    /// reads the halt instruction. (If your architecture lacks a
+    /// instruction fetcher, there should be some other way to specify the
+    /// halt state in HCL.)
+    Hlt = 2,
+    /// This state is assigned when the instruction memory or data memory is
+    /// accessed with an invalid address.
+    Adr = 3,
+    /// This state is assigned when the instruction fetcher reads an invalid
+    /// instruction code.
+    Ins = 4,
+}
+
+impl Default for Stat {
+    fn default() -> Self {
+        Self::Aok
+    }
+}
+
+impl std::fmt::Display for Stat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (name, s) = match self {
+            Stat::Aok => ("aok", crate::utils::GRN),
+            Stat::Bub => ("bub", crate::utils::GRAY),
+            Stat::Hlt => ("hlt", crate::utils::GRNB),
+            Stat::Adr => ("adr", crate::utils::REDB),
+            Stat::Ins => ("ins", crate::utils::REDB),
+        };
+        write!(f, "{s}{name}{s:#}")
+    }
+}
+
 /// Simulation result of the Y86 machine code on the standard ISA.
 pub struct StandardResult {
     pub bin: [u8; BIN_SIZE],
     pub cc: ConditionCode,
-    pub regs: [u64; 16],
+    pub regs: RegFile,
     pub pc: usize,
     pub n_insts: u64,
 }

@@ -11,54 +11,14 @@ use crate::{
     isa::{
         inst_code,
         reg_code::{self, *},
+        RegFile,
     },
-    utils::{format_reg_val, get_u64, put_u64},
+    utils::{get_u64, put_u64},
 };
-
-/// Simulator State (at each stage), depending on the hardware design.
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub enum Stat {
-    /// Indicates that everything is fine.
-    Aok = 0,
-    /// Indicates that the stage is bubbled. A bubbled stage execute the NOP
-    /// instruction. Initially, all stages are in the bubble state.
-    Bub = 1,
-    /// The halt state. This state is assigned when the instruction fetcher
-    /// reads the halt instruction. (If your architecture lacks a
-    /// instruction fetcher, there should be some other way to specify the
-    /// halt state in HCL.)
-    Hlt = 2,
-    /// This state is assigned when the instruction memory or data memory is
-    /// accessed with an invalid address.
-    Adr = 3,
-    /// This state is assigned when the instruction fetcher reads an invalid
-    /// instruction code.
-    Ins = 4,
-}
-
-impl Default for Stat {
-    fn default() -> Self {
-        Self::Aok
-    }
-}
-
-impl std::fmt::Display for Stat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (name, s) = match self {
-            Stat::Aok => ("aok", crate::utils::GRN),
-            Stat::Bub => ("bub", crate::utils::GRAY),
-            Stat::Hlt => ("hlt", crate::utils::GRNB),
-            Stat::Adr => ("adr", crate::utils::REDB),
-            Stat::Ins => ("ins", crate::utils::REDB),
-        };
-        write!(f, "{s}{name}{s:#}")
-    }
-}
 
 /// A constant that represents the value -8.
 pub const NEG_8: u64 = -8i64 as u64;
-pub use crate::isa::ConditionCode;
+pub use crate::isa::{ConditionCode, Stat};
 
 define_units! {
     InstructionMemory imem { // with split
@@ -138,7 +98,7 @@ define_units! {
     RegisterFile reg_file {
         .input(srca: u8, srcb: u8, dste: u8, dstm: u8, vale: u64, valm: u64)
         .output(vala: u64, valb: u64)
-        state: Rc<RefCell<[u64; 16]>>
+        state: Rc<RefCell<RegFile>>
     } {
         let state  = &mut state.borrow_mut();
         if dste != RNONE {
@@ -224,7 +184,9 @@ define_units! {
 
 impl std::fmt::Display for Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{regs}\n", regs = self.fmt_reg()))
+        let reg_file = self.reg_file.state.borrow();
+        let regs = crate::utils::format_reg_file(*reg_file);
+        f.write_fmt(format_args!("{regs}\n{cc}", cc = self.reg_cc.inner_cc))
     }
 }
 
@@ -248,24 +210,7 @@ impl HardwareUnits for Units {
         }
     }
 
-    fn register_file(&self) -> [u64; 16] {
+    fn register_file(&self) -> RegFile {
         self.reg_file.state.borrow().clone()
-    }
-}
-
-impl Units {
-    fn fmt_reg(&self) -> String {
-        let reg_file = self.reg_file.state.borrow();
-        format!(
-            "ax {rax} bx {rbx} cx {rcx} dx {rdx}\nsi {rsi} di {rdi} sp {rsp} bp {rbp}\n",
-            rax = format_reg_val(reg_file[RAX as usize]),
-            rbx = format_reg_val(reg_file[RBX as usize]),
-            rcx = format_reg_val(reg_file[RCX as usize]),
-            rdx = format_reg_val(reg_file[RDX as usize]),
-            rsi = format_reg_val(reg_file[RSI as usize]),
-            rdi = format_reg_val(reg_file[RDI as usize]),
-            rsp = format_reg_val(reg_file[RSP as usize]),
-            rbp = format_reg_val(reg_file[RBP as usize]),
-        ) + &format!("{cc}", cc = self.reg_cc.inner_cc)
     }
 }

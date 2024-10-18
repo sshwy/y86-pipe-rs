@@ -150,7 +150,7 @@ Besides, it is important to remember some basic types in Rust to define variable
 | `u64`     | `unsigned long long` |
 | `bool`    | `bool` (in C++)      |
 
-There are some other data structures. You can inspect their definition in `sim/src/architectures/hardware_seq.rs` (The syntax of Rust is similar to C/C++, so you can easily understand the code):
+There are some other data structures. You can inspect their definition in `sim/src/isa.rs` (The syntax of Rust is similar to C/C++, so you can easily understand the code):
 
 
 | Rust Type       |  Description                     |
