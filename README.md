@@ -163,6 +163,32 @@ To specify an architecture, you can use the `--arch` option. For example, to run
 ./target/debug/ysim [input_file].ys --arch seq_plus_std
 ```
 
+## Debugger Usage
+
+To provide a friendly coding experience, we develop a debugger server for the Y86 assembly language. This debugger server is used along with the `y86-debugger` VSCode extension.
+
+First you should install `y86-debugger` extension from `assets/y86-debugger-0.2.0.vsix` (choose "Install from VSIX..."). To install the extension on SSH remote servers, you can first install it on your local machine, then open a remote host VSCode window and choose "Install in SSH:..." to install the extension on the remote server.
+
+Then you should start the debugger server:
+
+```bash
+./target/debug/ydb -p 2345 # -p specifies the port number
+```
+
+After that you can start debugging in VSCode. You can set breakpoints, step through the code, and inspect the registers and memory. Click the debug icon at the right side of the menu bar to start debugging.
+
+By default, your assembly file is simulated with the `seq_std` architecture. If you want to change the architecture, you may use the `--arch` option:
+
+```bash
+# specify another architecture to debug
+# both builtin and extra architectures are supported
+./target/debug/ydb -p 2345 --arch seq_plus_std
+```
+
+Refer to [y86-debugger](https://github.com/sshwy/y86-debugger) for more information.
+
+![](assets/debugger-screenshot.png)
+
 ## HCL-rs Specification
 
 Please refer to this [attachment](assets/hcl-rs.pdf) for detailed description of the HCL-rs syntax.

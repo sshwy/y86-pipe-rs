@@ -13,7 +13,7 @@ pub struct SimOption {
 pub fn start_tcp_listener(port: u16, option: SimOption) -> anyhow::Result<()> {
     let addrs = [SocketAddr::from(([127, 0, 0, 1], port))];
     let listener = std::net::TcpListener::bind(&addrs[..]).context("failed to bind socket")?;
-    tracing::info!("listening on {:?}", listener.local_addr()?);
+    eprintln!("Debug server listening on {:?}, Press Ctrl+C to quit", listener.local_addr()?);
 
     ctrlc::set_handler(move || {
         eprintln!("exiting");
