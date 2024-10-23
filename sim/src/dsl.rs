@@ -28,6 +28,7 @@ macro_rules! define_units {
             use super::*;
             $(#[derive(Default, Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+            #[allow(non_snake_case)]
             pub struct $unit_name {
                 $($($(#[$input_att])* pub $iname: $itype, )*)?
             })*
@@ -38,6 +39,7 @@ macro_rules! define_units {
             use super::*;
             $(#[derive(Default, Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+            #[allow(non_snake_case)]
             pub struct $unit_name {
                 $($($(#[$output_att])* pub $oname: $otype, )*)?
             })*
@@ -142,6 +144,7 @@ macro_rules! define_stages {
             $(#[derive(Debug, Clone)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             $(#[$stage_att])*
+            #[allow(non_snake_case)]
             pub struct $pr_name {
                 $(pub $pname: $ptype, )*
                 /// A special input of the pipeline register. If `bubble` is true,

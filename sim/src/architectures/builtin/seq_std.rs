@@ -69,10 +69,10 @@ bool need_regids =
     icode in { CMOVX, OPQ, PUSHQ, POPQ, IRMOVQ, RMMOVQ, MRMOVQ };
 
 // Does fetched instruction require a constant word?
-bool need_valc = icode in { IRMOVQ, RMMOVQ, MRMOVQ, JX, CALL };
+bool need_valC = icode in { IRMOVQ, RMMOVQ, MRMOVQ, JX, CALL };
 
 @set_input(pc_inc, {
-    need_valc: need_valc,
+    need_valC: need_valC,
     need_regids: need_regids,
     old_pc: pc,
 });
@@ -84,58 +84,58 @@ bool need_valc = icode in { IRMOVQ, RMMOVQ, MRMOVQ, JX, CALL };
     need_regids: need_regids,
 });
 
-u64 valp = pc_inc.new_pc;
+u64 valP = pc_inc.new_pc;
 
 :=============================: Decode Stage :==============================:
 
 // What register should be used as the A source?
-u8 srca = [
-    icode in { CMOVX, RMMOVQ, OPQ, PUSHQ  } : ialign.ra;
+u8 srcA = [
+    icode in { CMOVX, RMMOVQ, OPQ, PUSHQ  } : ialign.rA;
     icode in { POPQ, RET } : RSP;
     true : RNONE; // Don't need register
 ];
 
 // What register should be used as the B source?
-u8 srcb = [
-    icode in { OPQ, RMMOVQ, MRMOVQ } : ialign.rb;
+u8 srcB = [
+    icode in { OPQ, RMMOVQ, MRMOVQ } : ialign.rB;
     icode in { PUSHQ, POPQ, CALL, RET } : RSP;
     true : RNONE; // Don't need register
 ];
 
 @set_input(reg_read, {
-    srca: srca,
-    srcb: srcb,
+    srcA: srcA,
+    srcB: srcB,
 });
 
 // What register should be used as the E destination?
-u8 dste = [
-    icode in { CMOVX } && cnd : ialign.rb;
-    icode in { IRMOVQ, OPQ} : ialign.rb;
+u8 dstE = [
+    icode in { CMOVX } && cnd : ialign.rB;
+    icode in { IRMOVQ, OPQ} : ialign.rB;
     icode in { PUSHQ, POPQ, CALL, RET } : RSP;
     true : RNONE; // Don't write any register
 ];
 
 // What register should be used as the M destination?
-u8 dstm = [
-    icode in { MRMOVQ, POPQ } : ialign.ra;
+u8 dstM = [
+    icode in { MRMOVQ, POPQ } : ialign.rA;
     true : RNONE; // Don't write any register
 ];
 
 :==============================: Execute Stage :===============================:
 
 // Select input A to ALU
-u64 alua = [
-    icode in { CMOVX, OPQ } : reg_read.vala;
-    icode in { IRMOVQ, RMMOVQ, MRMOVQ } : ialign.valc;
+u64 aluA = [
+    icode in { CMOVX, OPQ } : reg_read.valA;
+    icode in { IRMOVQ, RMMOVQ, MRMOVQ } : ialign.valC;
     icode in { CALL, PUSHQ } : NEG_8;
     icode in { RET, POPQ } : 8;
     // Other instructions don't need ALU
 ];
 
 // Select input B to ALU
-u64 alub = [
+u64 aluB = [
     icode in { RMMOVQ, MRMOVQ, OPQ, CALL,
-              PUSHQ, RET, POPQ } : reg_read.valb;
+              PUSHQ, RET, POPQ } : reg_read.valB;
     icode in { CMOVX, IRMOVQ } : 0;
     // Other instructions don't need ALU
 ];
@@ -147,20 +147,20 @@ u8 alufun = [
 ];
 
 @set_input(alu, {
-    a: alua,
-    b: alub,
+    a: aluA,
+    b: aluB,
     fun: alufun,
 });
 
 // Should the condition codes be updated?
 bool set_cc = icode in { OPQ };
 
-u64 vale = alu.e;
+u64 valE = alu.e;
 
 @set_input(reg_cc, {
-    a: alua,
-    b: alub,
-    e: vale,
+    a: aluA,
+    b: aluB,
+    e: valE,
     opfun: alufun,
     set_cc: set_cc,
 });
@@ -184,17 +184,17 @@ bool mem_write = icode in { RMMOVQ, PUSHQ, CALL };
 
 // Select memory address
 u64 mem_addr = [
-    icode in { RMMOVQ, PUSHQ, CALL, MRMOVQ } : vale;
-    icode in { POPQ, RET } : reg_read.vala;
+    icode in { RMMOVQ, PUSHQ, CALL, MRMOVQ } : valE;
+    icode in { POPQ, RET } : reg_read.valA;
     // Other instructions don't need address
 ];
 
 // Select memory input data
 u64 mem_data = [
     // Value from register
-    icode in { RMMOVQ, PUSHQ } : reg_read.vala;
+    icode in { RMMOVQ, PUSHQ } : reg_read.valA;
     // Return PC
-    icode == CALL : valp;
+    icode == CALL : valP;
     // Default: Don't write anything
 ];
 
@@ -205,13 +205,13 @@ u64 mem_data = [
     datain: mem_data,
 });
 
-u64 valm = dmem.dataout;
+u64 valM = dmem.dataout;
 
 @set_input(reg_write, {
-    dste: dste,
-    dstm: dstm,
-    valm: valm,
-    vale: vale,
+    dstE: dstE,
+    dstM: dstM,
+    valM: valM,
+    valE: valE,
 });
 
 // Determine instruction status
@@ -230,13 +230,13 @@ bool prog_term = stat in { Hlt, Adr, Ins };
 
 u64 new_pc = [
     // Call.  Use instruction constant
-    icode == CALL : ialign.valc;
+    icode == CALL : ialign.valC;
     // Taken branch.  Use instruction constant
-    icode == JX && cnd : ialign.valc;
+    icode == JX && cnd : ialign.valC;
     // Completion of RET instruction.  Use value from stack
-    icode == RET : valm;
+    icode == RET : valM;
     // Default: Use incremented PC
-    true : valp;
+    true : valP;
 ];
 
 @set_stage(s, {

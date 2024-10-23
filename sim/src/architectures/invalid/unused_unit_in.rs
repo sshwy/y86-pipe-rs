@@ -13,7 +13,7 @@ sim_macro::hcl! {
 u64 pc = S.pc -> imem.pc;
 
 // ALU requires 3 inputs, but only 1 is provided!
-u64 alua = S.pc -> alu.a;
+u64 aluA = S.pc -> alu.a;
 
 bool term = pc == 0;
 }

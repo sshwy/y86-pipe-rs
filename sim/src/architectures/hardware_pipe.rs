@@ -50,76 +50,76 @@ define_units! {
     }
 
     /// If `need_regids` is set to true, this unit will extract the register
-    /// IDs from the first byte, and valc from the rest of the bytes.
-    /// Otherwise the valc is extracted from the first 8 bytes and the last byte
+    /// IDs from the first byte, and valC from the rest of the bytes.
+    /// Otherwise the valC is extracted from the first 8 bytes and the last byte
     /// is ignored.
     Align ialign {
         .input(need_regids: bool, align: [u8; 9])
-        .output(ra: u8, rb: u8,
+        .output(rA: u8, rB: u8,
             /// Constant value extracted from the instruction. If the instruction
             /// does not need a constant value, this signal is meaningless.
-            valc: u64)
+            valC: u64)
     } {
         let ra_rb = align[0];
         let rest = if need_regids {
-            *ra = ra_rb >> 4;
-            *rb = ra_rb & 0xf;
+            *rA = ra_rb >> 4;
+            *rB = ra_rb & 0xf;
             &align[1..9]
         } else {
-            *ra = RNONE;
-            *rb = RNONE;
+            *rA = RNONE;
+            *rB = RNONE;
             &align[0..8]
         };
-        *valc = get_u64(rest)
+        *valC = get_u64(rest)
     }
 
     PCIncrement pc_inc {
-        .input(need_valc: bool, need_regids: bool, old_pc: u64)
+        .input(need_valC: bool, need_regids: bool, old_pc: u64)
         .output(
-            /// The new PC value computed based on need_valc and need_regids.
+            /// The new PC value computed based on need_valC and need_regids.
             new_pc: u64
         )
     } {
         let mut x = old_pc + 1;
         if need_regids { x += 1; }
-        if need_valc { x += 8; }
+        if need_valC { x += 8; }
         *new_pc = x;
     }
 
     /// The register file perform two tasks:
     ///
-    /// 1. Write the value of the destination register `dste` and `dstm`.
-    /// 2. Read the values of the source registers `srca` and `srcb`.
+    /// 1. Write the value of the destination register `dstE` and `dstM`.
+    /// 2. Read the values of the source registers `srcA` and `srcB`.
     ///
     /// If the register is `RNONE`, the corresponding operation is not performed.
     ///
     /// The order of first write then read is important as it prevents the
     /// structural hazard.
     RegisterFile reg_file {
-        .input(srca: u8, srcb: u8, dste: u8, dstm: u8, vale: u64, valm: u64)
-        .output(vala: u64, valb: u64)
+        .input(srcA: u8, srcB: u8, dstE: u8, dstM: u8, valE: u64, valM: u64)
+        .output(valA: u64, valB: u64)
         state: Rc<RefCell<RegFile>>
     } {
         let state  = &mut state.borrow_mut();
-        if dste != RNONE {
-            tracing::info!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
-            state[dste as usize] = vale;
+        if dstE != RNONE {
+            tracing::info!("write back fron e: dstE = {}, valE = {:#x}", reg_code::name_of(dstE), valE);
+            state[dstE as usize] = valE;
         }
-        if dstm != RNONE {
-            tracing::info!("write back fron m: dstm = {}, valm = {:#x}", reg_code::name_of(dstm), valm);
-            state[dstm as usize] = valm;
+        if dstM != RNONE {
+            tracing::info!("write back fron m: dstM = {}, valM = {:#x}", reg_code::name_of(dstM), valM);
+            state[dstM as usize] = valM;
         }
 
         // if RNONE, set to 0 for better debugging
-        *vala = if srca != RNONE { state[srca as usize] } else { 0 };
-        *valb = if srcb != RNONE { state[srcb as usize] } else { 0 };
-        if dste != RNONE {
-            tracing::info!("write back fron e: dste = {}, vale = {:#x}", reg_code::name_of(dste), vale);
-            state[dste as usize] = vale;
+        *valA = if srcA != RNONE { state[srcA as usize] } else { 0 };
+        *valB = if srcB != RNONE { state[srcB as usize] } else { 0 };
+        if dstE != RNONE {
+            tracing::info!("write back fron e: dstE = {}, valE = {:#x}", reg_code::name_of(dstE), valE);
+            state[dstE as usize] = valE;
         }
-        if dstm != RNONE {
-            tracing::info!("write back fron m: dstm = {}, valm = {:#x}", reg_code::name_of(dstm), valm);
-            state[dstm as usize] = valm;
+        if dstM != RNONE {
+            tracing::info!("write back fron m: dstM = {}, valM = {:#x}", reg_code::name_of(dstM), valM);
+            state[dstM as usize] = valM;
         }
     }
 

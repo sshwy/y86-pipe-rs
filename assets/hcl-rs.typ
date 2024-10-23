@@ -160,13 +160,13 @@ The following #HCLrs code snippet in `sim/src/architectures/builtin/seq_plus_std
 // What address should instruction be fetched at
 u64 pc = [
     // Call.  Use instruction constant
-    S.icode == CALL : S.valc;
+    S.icode == CALL : S.valC;
     // Taken branch.  Use instruction constant
-    S.icode == JX && S.cnd : S.valc;
+    S.icode == JX && S.cnd : S.valC;
     // Completion of RET instruction.  Use value from stack
-    S.icode == RET : S.valm;
+    S.icode == RET : S.valM;
     // Default: Use incremented PC
-    true : S.valp;
+    true : S.valP;
 ];
 ```
 
@@ -223,8 +223,8 @@ Inside the `sim_macro::hcl` macro block, there are a few lines of code that desc
   This attribute defines the identifiers for pipeline registers. For `F => f`, which means this pipeline register in the last cycle is denoted by `F`, and in this cycle is denoted by `f`, the
   identifier `f` should be the short name of the pipeline register defined in `crate::define_stages`, while `F` can actually be selected arbitrarily.
 
-  For a practical instance, `D.vala` is the value at the start of the cycle (you should treat it as
-  read-only), while `d.vala` is the value at the end of the cycle (you should assign to it using `@set_stage(d, { vala: signal })`).
+  For a practical instance, `D.valA` is the value at the start of the cycle (you should treat it as
+  read-only), while `d.valA` is the value at the end of the cycle (you should assign to it using `@set_stage(d, { valA: signal })`).
 
 == Stage Divider (#HCLrs feature)
 

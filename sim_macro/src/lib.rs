@@ -188,7 +188,7 @@ impl HclData {
 
         quote! {
             #[derive(Debug, Default, Clone)]
-            #[allow(unused)]
+            #[allow(unused, non_snake_case)]
             #[cfg_attr(feature = "serde", derive(serde::Serialize))]
             pub struct IntermediateSignal {
                 #signal_fields
