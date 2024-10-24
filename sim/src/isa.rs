@@ -218,7 +218,7 @@ pub struct StandardResult {
 ///
 /// It supports the extended `iopq` instruction.
 pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<StandardResult> {
-    let original = bin.clone();
+    let original = bin;
     let mut pc = 0;
 
     fn ensure_reg(reg: u8) -> anyhow::Result<usize> {
@@ -375,7 +375,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 if addr >= BIN_SIZE {
                     anyhow::bail!("invalid memory address: {:#x}", addr);
                 }
-                reg_file[ra] = get_u64(&mut bin[addr..(addr + 8)]);
+                reg_file[ra] = get_u64(&bin[addr..(addr + 8)]);
 
                 nex_pc
             }

@@ -25,12 +25,12 @@ impl SimTester {
     /// Simulate the given source code and return the simulator and the memory
     /// after the simulation.
     fn simulate_arch(arch: String, src: &str) -> anyhow::Result<(Box<dyn CpuSim>, MemData)> {
-        let obj = make_obj(&src)?;
+        let obj = make_obj(src)?;
         let mem = MemData::init(obj.obj.init_mem());
         let mut pipe = crate::architectures::create_sim(arch, mem.clone(), false);
         while !pipe.is_terminate() {
             pipe.step();
-            if pipe.cycle_count() > 3000_000 {
+            if pipe.cycle_count() > 3_000_000 {
                 anyhow::bail!("exceed maximum CPU cycle limit");
             }
         }

@@ -179,7 +179,7 @@ impl PropOrderBuilder {
             .collect();
 
         // compute distance of each node from the source
-        let mut dist: HashMap<&String, u32> = HashMap::new();
+        let mut dist: HashMap<&str, u32> = HashMap::new();
         for node in levels {
             let is_unit = self.runnable_nodes.iter().any(|(is, p)| *is && p == node);
             for from in self
@@ -187,7 +187,7 @@ impl PropOrderBuilder {
                 .iter()
                 .filter_map(|(from, to)| (to == node).then_some(from))
             {
-                let dist_from = dist.get(&from).copied().unwrap_or(0);
+                let dist_from = dist.get(from.as_str()).copied().unwrap_or(0);
                 let dist_node = dist.entry(node).or_default();
                 *dist_node = (*dist_node).max(dist_from + is_unit as u32);
             }
@@ -199,7 +199,7 @@ impl PropOrderBuilder {
             .map(|(is_unit, p)| PropOrderItem {
                 is_unit,
                 name: p,
-                level: dist.get(&p.to_owned()).copied().unwrap_or_default(),
+                level: dist.get(p).copied().unwrap_or_default(),
             })
             .collect::<Vec<_>>();
         order.sort_by_key(|a| a.level);

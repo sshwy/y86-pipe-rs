@@ -199,6 +199,6 @@ impl HardwareUnits for Units {
     }
 
     fn register_file(&self) -> RegFile {
-        self.reg_read.state.borrow().clone()
+        *self.reg_read.state.borrow()
     }
 }

@@ -108,11 +108,11 @@ impl Parse for HclData {
             } else if lookahead.peek(Token![@]) {
                 let _ = input.parse::<Token![@]>()?;
                 let fn_name = input.parse::<syn::Ident>()?;
-                if fn_name.to_string() == "set_input" {
+                if fn_name == "set_input" {
                     let unit_input = input.parse::<items::ComponentInputs>()?;
                     set_inputs.push(unit_input);
                     let _ = input.parse::<Token![;]>()?;
-                } else if fn_name.to_string() == "set_stage" {
+                } else if fn_name == "set_stage" {
                     let unit_input = input.parse::<items::ComponentInputs>()?;
                     set_stages.push(unit_input);
                     let _ = input.parse::<Token![;]>()?;

@@ -19,9 +19,9 @@ macro_rules! interp_args {
 
 impl SimTester {
     fn test_isa_write_on_fail(&self, src: &str) -> anyhow::Result<TestIsaResult> {
-        self.test_isa(&src).inspect_err(|_| {
+        self.test_isa(src).inspect_err(|_| {
             // Write the failing test case to a file
-            std::fs::write("test-failure.ys", &src).unwrap();
+            std::fs::write("test-failure.ys", src).unwrap();
         })
     }
 
