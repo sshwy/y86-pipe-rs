@@ -190,7 +190,7 @@ pub fn render_arch_dependency_graph(
 
     let mut r = HtmlRenderer::new("Architecture Computational Dependency Graph", 1200, 800);
     let outpath = format!("{}_dependency_graph.html", arch_name);
-    eprintln!(
+    println!(
         "dependency graph visualization is generated at: {}",
         outpath
     );

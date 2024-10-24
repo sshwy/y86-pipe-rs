@@ -97,7 +97,7 @@ fn main() -> Result<()> {
     if args.info {
         let empty_sim = create_sim(arch.clone(), MemData::init([0; MEM_SIZE]), false);
 
-        println!("{}", empty_sim);
+        print!("{}", empty_sim);
 
         utils::render_arch_dependency_graph(&arch, empty_sim.proporder())?;
     } else {

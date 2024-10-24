@@ -516,7 +516,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
     if tty_out {
         println!();
         println!("total instructions: {}", n_insts);
-        print!("{}", format_reg_file(reg_file));
+        println!("{}", format_reg_file(reg_file));
         mem_diff(&original, &bin);
     }
 
