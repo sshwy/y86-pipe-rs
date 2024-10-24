@@ -13,7 +13,7 @@
 
 Weiyao Huang 
 
-#datetime(year: 2024, month:  10, day: 19).display("[month repr:short] [day padding:none], [year]")
+#datetime(year: 2024, month:  10, day: 25).display("[month repr:short] [day padding:none], [year]")
 ])
 
 #let HCLrs = [*HCL-rs*]
@@ -32,19 +32,19 @@ The parser of the HCL in CS:APP2e in the original Archlab is implemented with `b
 2. Lack of type checking and error reporting when writing HCL source code.
 3. Lack of a good way to debug the Y86 processor described by the HCL.
 
-Moreover, the C implementation of the simulator in the original Archlab trigger each pipeline stage in a fixed order (F-M-E-D-W), which is not flexible enough to support arbitrary HCL descriptions.
+Moreover, the C implementation of the simulator in the original Archlab triggers each pipeline stage in a fixed order (F-M-E-D-W), which is not flexible enough to support arbitrary HCL descriptions.
 
 In order to provide a better lab experience with greater flexibility and modern development practices, we decided to reimplement the HCL parser and simulator in Rust. With the help of the VSCode extension `rust-analyzer`, we can now enjoy syntax highlighting, auto-completion, type checking, and error reporting when writing HCL source code. Moreover, a debugger and its corresponding VSCode extension are also provided to help debug the Y86 processor described by the HCL.
 
 = Rust Implementation
 
-One's #HCLrs source code is written in some macro blocks in a Rust source file. These macros convert your descriptions into Rust source code that defines a simulator structure. Macro blocks are processed during the preprocess stage (just like `#define` in C), thus Rust compiler and editor extensions are able to check the #HCLrs source during development and in build time.
+One's #HCLrs source code is written in some macro blocks in a Rust source file. These macros convert your descriptions into Rust source code that defines a simulator structure. Macro blocks are processed during the preprocessing stage (just like `#define` in C), thus Rust compiler and editor extensions are able to check the #HCLrs source during development and in build time.
 
 You can browse the macro implementation in `sim_macro` for details.
 
 = Data Types
 
-In general, any Rust data types can be used in #HCLrs source. But firstly since the operator in expression are limited, and secondly according to the hardware defined in this Archlab, we restrict available data types to the following items:
+In general, any Rust data types can be used in #HCLrs source. But firstly since the operators in expressions are limited, and secondly according to the hardware defined in this Archlab, we restrict available data types to the following items:
 
 == Primitive Types
 
@@ -56,7 +56,7 @@ In general, any Rust data types can be used in #HCLrs source. But firstly since 
   `bool`, `bool`, [`true`, `false`]
 )
 
-Bare it in mind that there is no C-style numerical implict type convertion in Rust. i. e. For `u64 a` and `u8 b`, the expression `a == b` is invalid.
+Bear in mind that there is no C-style numerical implicit type conversion in Rust. i. e. For `u64 a` and `u8 b`, the expression `a == b` is invalid.
 
 == Predefined Types
 
@@ -93,9 +93,9 @@ There are some other data structures. You can inspect their definition in `sim/s
 
   #raw(stat_def, lang: "rust")
 
-  This enum can be seen as a set of type-guarded constant values. For example you can directly use `Aok`, `Bub` in your HCL source code. You may write `Aok == Bub` as a Boolean expresion, but you cannot write `Aok == 1` since the operands are not belonging to the same type.
+  This enum can be seen as a set of type-guarded constant values. For example, you can directly use `Aok`, `Bub` in your HCL source code. You may write `Aok == Bub` as a Boolean expression, but you cannot write `Aok == 1` since the operands do not belong to the same type.
 
-  Note that you are *NOT* enforced to use this type for pipeline register status tracing. You can just use raw numerical values for that purpose. This data type is provided for code readability and debugger.
+  Note that you are *NOT* forced to use this type for pipeline register status tracing. You can just use raw numerical values for that purpose. This data type is provided for code readability and debugger.
 
   In the HCL macro block, you can directly use `Aok`, `Bub` to refer to these values.
 
@@ -172,7 +172,7 @@ u64 pc = [
 
 == Set Device/PipeReg's Input Signal (#HCLrs feature)
 
-Another drawback of the old archlab that its HCL does not clearly show the relation of the hardware devices (pipeline register fields) and the intermediate signals. Here we provide a syntax to set the input signal of a device in the HCL code:
+Another drawback of the old archlab is that its HCL does not clearly show the relation between the hardware devices (pipeline register fields) and the intermediate signals. Here we provide a syntax to set the input signal of a device in the HCL code:
 
 ```
 @set_input(device_identifier, {
@@ -196,18 +196,18 @@ To set the input signal of a pipeline register, you can use the following syntax
 
 == Global Attributes (#HCLrs feature)
 
-Inside the `sim_macro::hcl` macro block, there are a few lines of code that describes some settings about the architecture:
+Inside the `sim_macro::hcl` macro block, there are a few lines of code that describe some settings of the architecture:
 
 + `#![hardware = some::rust::module]`
 
-  This attribute specify the CPU hardware devices set. Essentially it will imports all items from the hardware module.
+  This attribute specifies the CPU hardware devices set. Essentially it will import all items from the hardware module.
 
 + `#![program_counter = pc_name]`
 
   It specifies the program counter by an intermediate signal. This value is read by
-  debugger. Conventionally, when we create a breakpoint at a line of the code, the
+  the debugger. Conventionally, when we create a breakpoint at a line of code, the
   debugger seems to stop before executing the line of code. But in this simulator,
-  The breakpoint take effects when the current cycle is executed (so the value of pc
+  The breakpoint takes effect when the current cycle is executed (so the value of pc
   is calculated) and _before entering the next cycle_.
 
   Changing this value to other signals makes no difference to the simulation.
@@ -229,9 +229,9 @@ Inside the `sim_macro::hcl` macro block, there are a few lines of code that desc
 == Stage Divider (#HCLrs feature)
 
 We provide a special divider syntax to separate different (semantic) stages in your HCL logic.
-You can use `:====: title :====:` (the bar on both sides can be arbitrarily long) to declare a section. This helps to organize your code and the information displayed by debugger. It makes no difference in the simulation. That means it does not alter the evaluation order of CPU cycle.
+You can use `:====: title :====:` (the bar on both sides can be arbitrarily long) to declare a section. This helps to organize your code and the information displayed by the debugger. It makes no difference in the simulation. That means it does not alter the evaluation order of the CPU cycle.
 
-With stage divider, your entire HCL code may look like this:
+With the stage divider, your entire HCL code may look like this:
 
 ```
 sim_macro::hcl! {
@@ -248,11 +248,11 @@ sim_macro::hcl! {
 
 :=============================: Decode and Stage :=============================:
 
-// signals defined in decode stage ...
+// signals defined in the decode stage ...
 
 :==============================: Execute Stage :===============================:
 
-// signals defined in execute stage ...
+// signals defined in the execute stage ...
 
 :===============================: Memory Stage :===============================:
 
@@ -260,7 +260,7 @@ sim_macro::hcl! {
 
 :=============================: Write Back Stage :=============================:
 
-// signals defined in write back stage ...
+// signals defined in the write back stage ...
 
 :========================: Pipeline Register Control :=========================:
 
@@ -271,7 +271,7 @@ sim_macro::hcl! {
 
 = Pipeline Register Declaration (#HCLrs feature)
 
-A pipeline register, in this simulator, can be regarded as a struct with each field assigned a default value. All pipeline registers are defined in the `crate::define_stages` macro block. The syntax is as follows:
+In this simulator, a pipeline register can be regarded as a struct, with each field assigned a default value. All pipeline registers are defined in the `crate::define_stages` macro block. The syntax is as follows:
 
 ```
 crate::define_stages! {
@@ -286,9 +286,9 @@ crate::define_stages! {
 }
 ```
 
-Note that each pipeline register has _two implict input fields_: `stall` and `bubble`. These special inputs are used to control the pipeline register's behavior. Still, you can set them in the HCL code by `@set_stage(stage_short_name, { stall: signal1, bubble: signal2 })`.
+Note that each pipeline register has _two implicit input fields_: `stall` and `bubble`. These special inputs are used to control the pipeline register's behavior. Still, you can set them in the HCL code by `@set_stage(stage_short_name, { stall: signal1, bubble: signal2 })`.
 
-The usage of pipeline register is the same as an ordinary struct in C. You can access its fields by `stage_last_name.field_name`, where `stage_last_name`
+The usage of the pipeline register is the same as an ordinary struct in C. You can access its fields by `stage_last_name.field_name`, where `stage_last_name`
  is defined in
  
 ```
@@ -299,6 +299,6 @@ Although accessing `stage_short_name.field_name` does not cause a compile-time e
 
 = Hardware Definitions
 
-The hardware definition is written in Rust (which is not required to understand). You can find the hardware module in `sim/src/architectures/{hardware_seq.rs,hardware_pipe.rs}`. A hardware module defines the CPU hardware devices set, containing a list of devices (units), their input and output fields, which are the only things one should know to implement a correct HCL logic.
+The hardware definition is written in Rust (which is not required to understand). You can find the hardware module in `sim/src/architectures/{hardware_seq.rs,hardware_pipe.rs}`. A hardware module defines the CPU hardware devices set, containing a list of devices (units), and their input and output fields, which are the only things one should know to implement a correct HCL logic.
 
 To access the output of a device is as simple as `device_short_name.field_name`. To set the input of a device, you need to use the `@set_input` syntax.

@@ -127,7 +127,8 @@ For example, by running `./target/debug/yis swap.yo`, the simulator will print t
 
 total instructions: 10
 ax 0000000000000000 bx 0000000000000000 cx 0000000000000bca dx 0000000000000cba
-si 0000000000000000 di 0000000000000050 sp 0000000000000200 bp 00000000000000f00x0050: ba0c000000000000 -> ca0b000000000000
+si 0000000000000000 di 0000000000000050 sp 0000000000000200 bp 00000000000000f0
+0x0050: ba0c000000000000 -> ca0b000000000000
 0x0058: ca0b000000000000 -> ba0c000000000000
 ```
 
@@ -162,6 +163,31 @@ To specify an architecture, you can use the `--arch` option. For example, to run
 ```bash
 ./target/debug/ysim [input_file].ys --arch seq_plus_std
 ```
+
+You can also inspect an architecture via `-I` option:
+
+```bash
+./target/debug/ysim --arch seq_plus_std -I
+```
+
+Its output will be like:
+
+```
+propagate order:
+lv.1: pc
+lv.2: imem align icode ifun instr_valid mem_read mem_write need_regids need_valC set_cc alufun
+lv.3: ialign pc_inc dstM srcA srcB valC valP
+lv.4: reg_read aluA mem_data aluB
+lv.5: alu valE mem_addr
+lv.6: reg_cc dmem cc valM stat prog_term
+lv.7: cond cnd dstE
+lv.8: reg_write
+dependency graph visualization is generated at: seq_plus_std_dependency_graph.html
+```
+
+Here an HTML file is generated to visualize the dependency graph of the architecture. You can open the HTML file in a browser to view the dependency graph. In the graph, blue blocks are hardware components, and red blocks are signals. You can drag each block to change its position.
+
+![](assets/visualization-screenshot.png)
 
 ## Debugger Usage
 
