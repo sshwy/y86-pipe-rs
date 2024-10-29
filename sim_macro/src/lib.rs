@@ -665,7 +665,7 @@ pub fn extra_pipelines(_item: proc_macro::TokenStream) -> proc_macro::TokenStrea
     let dir = PathBuf::from(
         env::var_os("CARGO_MANIFEST_DIR")
             .map(|s| s.to_string_lossy().to_string())
-            .unwrap(),
+            .expect("CARGO_MANIFEST_DIR not found"),
     );
     assert!(dir.ends_with("sim"));
 
@@ -674,15 +674,15 @@ pub fn extra_pipelines(_item: proc_macro::TokenStream) -> proc_macro::TokenStrea
     let dir = dir.join("src/architectures/extra");
     for entry in std::fs::read_dir(dir).unwrap().filter_map(Result::ok) {
         if entry.file_type().unwrap().is_file() && entry.file_name() != "mod.rs" {
-            let mod_name = entry
+            if let Some(mod_name) = entry
                 .file_name()
                 .to_string_lossy()
                 .to_string()
                 .strip_suffix(".rs")
-                .unwrap()
-                .to_string();
-            let mod_ident = format_ident!("{}", mod_name);
-            idents.push(mod_ident);
+            {
+                let mod_ident = format_ident!("{}", mod_name);
+                idents.push(mod_ident);
+            }
         }
     }
 
