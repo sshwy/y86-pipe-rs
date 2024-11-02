@@ -13,31 +13,35 @@ pub const BIN_SIZE: usize = MEM_SIZE;
 type SymbolMap = BTreeMap<String, u64>;
 
 impl asm::Imm {
-    fn desymbol(&self, sym: &SymbolMap) -> u64 {
+    /// Get the address of the immediate value.
+    fn desymbol(&self, sym: &SymbolMap) -> anyhow::Result<u64> {
         match self {
-            asm::Imm::Num(n) => *n as u64,
-            asm::Imm::Label(label) => sym[label],
+            asm::Imm::Num(n) => Ok(*n as u64),
+            asm::Imm::Label(label) => sym
+                .get(label)
+                .copied()
+                .ok_or(anyhow::anyhow!("Undefined label: {}", label)),
         }
     }
 }
 impl asm::Inst<asm::Imm> {
-    pub fn desymbol(&self, sym: &SymbolMap) -> asm::Inst<u64> {
+    pub fn desymbol(&self, sym: &SymbolMap) -> anyhow::Result<asm::Inst<u64>> {
         use asm::Inst::*;
-        match self {
+        Ok(match self {
             HALT => HALT,
             NOP => NOP,
             CMOVX(cond, ra, rb) => CMOVX(*cond, *ra, *rb),
-            IRMOVQ(rb, v) => IRMOVQ(*rb, v.desymbol(sym)),
+            IRMOVQ(rb, v) => IRMOVQ(*rb, v.desymbol(sym)?),
             RMMOVQ(ra, addr) => RMMOVQ(*ra, *addr),
             MRMOVQ(addr, ra) => MRMOVQ(*addr, *ra),
             OPQ(op, ra, rb) => OPQ(*op, *ra, *rb),
-            JX(cond, v) => JX(*cond, v.desymbol(sym)),
-            CALL(v) => CALL(v.desymbol(sym)),
+            JX(cond, v) => JX(*cond, v.desymbol(sym)?),
+            CALL(v) => CALL(v.desymbol(sym)?),
             RET => RET,
             PUSHQ(ra) => PUSHQ(*ra),
             POPQ(ra) => POPQ(*ra),
-            IOPQ(op, imm, reg) => IOPQ(*op, imm.desymbol(sym), *reg),
-        }
+            IOPQ(op, imm, reg) => IOPQ(*op, imm.desymbol(sym)?, *reg),
+        })
     }
 }
 
@@ -49,11 +53,11 @@ macro_rules! h2 {
 }
 
 impl LineInfo {
-    pub fn write_object(&self, obj: &mut Object) {
+    pub fn write_object(&self, obj: &mut Object) -> anyhow::Result<()> {
         if let Some(addr) = self.addr {
             let addr = addr as usize;
             if let Some(inst) = &self.inst {
-                match inst.desymbol(&obj.symbols) {
+                match inst.desymbol(&obj.symbols)? {
                     asm::Inst::HALT => obj.binary[addr] = h2!(inst.icode(), 0),
                     asm::Inst::NOP => obj.binary[addr] = h2!(inst.icode(), 0),
                     asm::Inst::CMOVX(c, ra, rb) => {
@@ -106,10 +110,12 @@ impl LineInfo {
                 }
             }
             if let Some((sz, data)) = &self.data {
-                let data = data.desymbol(&obj.symbols);
+                let data = data.desymbol(&obj.symbols)?;
                 obj.write_num_data(addr, *sz, data);
             }
         }
+
+        Ok(())
     }
 }
 

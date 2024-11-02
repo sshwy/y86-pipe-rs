@@ -39,7 +39,8 @@ fn main() -> Result<()> {
 
     let content = std::fs::read_to_string(&args.input)
         .with_context(|| format!("could not read file `{}`", args.input))?;
-    let a = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))?;
+    let a = assemble(&content, AssembleOption::default().set_verbose(verbose_asm))
+        .with_context(|| format!("assemble {}", args.input))?;
 
     let output_path = if let Some(path) = args.output {
         path

@@ -458,7 +458,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
     verbo!(&obj.symbols);
 
     for it in &src_infos {
-        it.write_object(&mut obj)
+        it.write_object(&mut obj)?;
     }
 
     Ok(ObjectExt {
