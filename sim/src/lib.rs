@@ -16,7 +16,8 @@ mod tests {
 
     #[test]
     fn test_assemble() {
-        let r = assemble(crate::asm::tests::RSUM_YS, AssembleOption::default()).unwrap();
+        let r =
+            assemble(crate::asm::tests::RSUM_YS, AssembleOption::default()).expect("test failed");
         dbg!(&r.source);
         eprintln!("{}", r);
     }

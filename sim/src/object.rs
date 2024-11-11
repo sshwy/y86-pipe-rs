@@ -140,6 +140,15 @@ pub struct Object {
     pub symbols: SymbolMap,
 }
 
+impl std::fmt::Debug for Object {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Object")
+            // .field("binary", &self.binary)
+            .field("symbols", &self.symbols)
+            .finish()
+    }
+}
+
 impl Object {
     fn write_num_data(&mut self, addr: usize, sz: u8, data: u64) {
         for i in 0..sz as usize {
@@ -183,7 +192,7 @@ impl SourceInfo {
 /// object file with source info.
 ///
 /// To render the yo file, use `format!("{}", obj)`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ObjectExt {
     pub obj: Object,
     /// annotate each line with its address

@@ -31,7 +31,12 @@ impl Parse for StageDecl {
             let ident = input
                 .parse::<syn::Ident>()
                 .map(|id| id.to_string())
-                .unwrap_or_else(|_| input.parse::<syn::LitStr>().unwrap().value());
+                .unwrap_or_else(|_| {
+                    input
+                        .parse::<syn::LitStr>()
+                        .expect("invalid section title")
+                        .value()
+                });
             name.push(ident);
         }
         let _ = input.parse::<StageTitleBoundary>()?;
@@ -94,7 +99,7 @@ impl Parse for Case {
 
         let tunnel = attr.iter().find_map(|attr| {
             if attr.path().is_ident("tunnel") {
-                let tunnel_name: syn::Ident = attr.parse_args().unwrap();
+                let tunnel_name: syn::Ident = attr.parse_args().expect("invalid tunnel name");
                 Some(tunnel_name)
             } else {
                 None
@@ -133,7 +138,7 @@ impl Parse for SignalSourceExpr {
         let expr: expr::Expr = input.parse()?;
         let tunnel = attr.iter().find_map(|attr| {
             if attr.path().is_ident("tunnel") {
-                let tunnel_name: syn::Ident = attr.parse_args().unwrap();
+                let tunnel_name: syn::Ident = attr.parse_args().expect("invalid tunnel name");
                 Some(tunnel_name)
             } else {
                 None
@@ -186,7 +191,7 @@ impl Parse for SignalDest {
 
         let tunnel = attr.iter().find_map(|attr| {
             if attr.path().is_ident("tunnel") {
-                let tunnel_name: syn::Ident = attr.parse_args().unwrap();
+                let tunnel_name: syn::Ident = attr.parse_args().expect("invalid tunnel name");
                 Some(tunnel_name)
             } else {
                 None

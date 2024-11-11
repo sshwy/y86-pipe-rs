@@ -64,7 +64,7 @@ fn main() -> anyhow::Result<()> {
     let log_level = binutils::verbose_level_to_trace(args.verbose.log_level());
     binutils::logging_setup(log_level, None::<&std::fs::File>);
 
-    let arch = args.arch.unwrap();
+    let arch = args.arch.expect("architecture is required");
     if !arch_names().contains(&arch.as_str()) {
         let mut cmd = Args::command();
         cmd.error(
@@ -75,10 +75,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     y86_dbg::start_tcp_listener(
-        args.port.unwrap(),
+        args.port.expect("port number is required"),
         SimOption {
             arch,
-            max_cpu_cycle: args.max_cpu_cycle.unwrap(),
+            max_cpu_cycle: args.max_cpu_cycle.expect("max_cpu_cycle is required"),
         },
     )?;
 

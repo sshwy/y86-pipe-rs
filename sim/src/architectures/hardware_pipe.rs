@@ -41,7 +41,7 @@ define_units! {
             let icode_ifun = binary[pc];
             *icode = icode_ifun >> 4;
             *ifun = icode_ifun & 0xf;
-            *align = binary[pc+1..pc+10].try_into().unwrap();
+            *align = binary[pc+1..pc+10].try_into().expect("fail to load 9 bytes from imem");
         }
 
         if *icode == inst_code::CALL {

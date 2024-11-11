@@ -90,7 +90,11 @@ impl<R: Read, W: Write> DebugServer<R, W> {
         let sim = create_sim(self.sim_opt.arch.clone(), mem, false);
         let source_path = program.clone();
         let source_info = a.source;
-        let source_name = program.file_name().unwrap().to_string_lossy().to_string();
+        let source_name = program
+            .file_name()
+            .expect("fail to get program file name")
+            .to_string_lossy()
+            .to_string();
         let main_source = types::Source {
             name: Some(source_name.clone()),
             path: Some(source_path.display().to_string()),
@@ -192,7 +196,10 @@ impl<R: Read, W: Write> DebugServer<R, W> {
                     .iter()
                     .map(|b| {
                         let verified = true;
-                        let ln = inner.source_info.get_line(b.line).unwrap();
+                        let ln = inner
+                            .source_info
+                            .get_line(b.line)
+                            .expect("invalid breakpoint line");
                         let message = ln.addr.map(|a| format!("addr: {:#x}", a));
 
                         let Some(addr) = ln.addr else {

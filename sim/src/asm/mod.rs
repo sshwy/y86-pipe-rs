@@ -17,7 +17,7 @@ pub fn parse(src: &str) -> Result<pest::iterators::Pair<'_, Rule>> {
     Ok(Y86AsmParser::parse(Rule::main, src)
         .context("fail to parse ys file")?
         .next()
-        .unwrap())
+        .expect("invalid parse rule"))
 }
 
 /// registers
@@ -69,7 +69,10 @@ impl TryFrom<&str> for Reg {
 
 impl From<pest::iterators::Pair<'_, Rule>> for Reg {
     fn from(value: pest::iterators::Pair<'_, Rule>) -> Self {
-        value.as_str().try_into().unwrap()
+        value
+            .as_str()
+            .try_into()
+            .expect("invalid register parse rule")
     }
 }
 
@@ -139,14 +142,14 @@ pub struct Addr(pub Option<u64>, pub Reg);
 impl From<ParseInput<'_>> for Addr {
     fn from(value: ParseInput<'_>) -> Self {
         let mut it = value.into_iter();
-        let num_or_reg = it.next().unwrap();
+        let num_or_reg = it.next().expect("expect number or register");
         if num_or_reg.as_rule() == Rule::reg {
             // no displacement
             let reg = Reg::from(num_or_reg.pair);
             Self(None, reg)
         } else {
             let s = num_or_reg.as_str();
-            let num = utils::parse_literal(s).unwrap() as i64;
+            let num = utils::parse_literal(s).expect("fail to parse number literal") as i64;
             let reg = it.next_reg();
             Self(Some(num as u64), reg)
         }
@@ -167,7 +170,7 @@ impl From<ParseInput<'_>> for Imm {
         } else {
             let s = value.as_str();
             let s = s.strip_prefix('$').unwrap_or(s);
-            let num = utils::parse_literal(s).unwrap() as i64;
+            let num = utils::parse_literal(s).expect("fail to parse number literal") as i64;
             Self::Num(num)
         }
     }
@@ -285,17 +288,22 @@ impl<'a> Iterator for ParseInputs<'a> {
 impl<'a> ParseInputs<'a> {
     /// Parse next token as string
     fn next_str(&mut self) -> &str {
-        self.next().unwrap().as_str()
+        self.next().expect("expect string token").as_str()
     }
 
     /// Parse next token as register
     fn next_reg(&mut self) -> Reg {
-        Reg::from(self.next().unwrap().pair)
+        Reg::from(self.next().expect("expect register token").pair)
     }
 
     /// Parse next token as address
     fn next_addr(&mut self) -> Addr {
-        Addr::from(self.next().unwrap())
+        Addr::from(self.next().expect("expect address token"))
+    }
+
+    /// Parse next token as immediate
+    fn next_imm(&mut self) -> Imm {
+        Imm::from(self.next().expect("expect immediate number token"))
     }
 }
 
@@ -370,7 +378,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     cur_addr += 10
                 }
                 Rule::i_irmovq => {
-                    let imm = Imm::from(it.next().unwrap());
+                    let imm = it.next_imm();
                     let reg = it.next_reg();
                     src_info.inst = Some(Inst::IRMOVQ(reg, imm));
                     cur_addr += 10
@@ -383,7 +391,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                     cur_addr += 2
                 }
                 Rule::i_iopq => {
-                    let imm = Imm::from(it.next().unwrap());
+                    let imm = it.next_imm();
                     let reg = it.next_reg();
                     let op_fn = OpFn::from_instname(tok2.as_str());
                     src_info.inst = Some(Inst::IOPQ(op_fn, imm, reg));
@@ -391,12 +399,12 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                 }
                 Rule::i_jx => {
                     let cond_fn = CondFn::from(it.next_str());
-                    let imm = Imm::from(it.next().unwrap());
+                    let imm = it.next_imm();
                     src_info.inst = Some(Inst::JX(cond_fn, imm));
                     cur_addr += 9
                 }
                 Rule::i_call => {
-                    let imm = Imm::from(it.next().unwrap());
+                    let imm = it.next_imm();
                     src_info.inst = Some(Inst::CALL(imm));
                     cur_addr += 9
                 }
@@ -412,12 +420,12 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                 }
                 Rule::d_pos => {
                     let s = it.next_str();
-                    let num = utils::parse_literal(s).unwrap();
+                    let num = utils::parse_literal(s).expect("fail to parse number literal");
                     cur_addr = num;
                     src_info.addr = Some(cur_addr) // override
                 }
                 Rule::d_data => {
-                    let imm = Imm::from(it.next().unwrap());
+                    let imm = it.next_imm();
                     if tok2.as_str().starts_with(".quad") {
                         src_info.data = Some((8, imm));
                         cur_addr += 8;
@@ -436,7 +444,7 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
                 }
                 Rule::d_align => {
                     let s = it.next_str();
-                    let num = utils::parse_literal(s).unwrap();
+                    let num = utils::parse_literal(s).expect("fail to parse number literal");
                     anyhow::ensure!(num.count_ones() == 1, "invalid align number");
                     if cur_addr % num > 0 {
                         cur_addr = cur_addr / num * num + num // ceil
@@ -452,13 +460,15 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
     let mut obj = Object::default();
     for info in &src_infos {
         if let Some(label) = &info.label {
-            obj.symbols.insert(label.clone(), info.addr.unwrap());
+            obj.symbols
+                .insert(label.clone(), info.addr.expect("label address not set"));
         }
     }
     verbo!(&obj.symbols);
 
-    for it in &src_infos {
-        it.write_object(&mut obj)?;
+    for (nu, it) in src_infos.iter().enumerate() {
+        it.write_object(&mut obj)
+            .with_context(|| format!("line {}", nu + 1))?;
     }
 
     Ok(ObjectExt {
@@ -471,11 +481,10 @@ pub fn assemble(src: &str, option: AssembleOption) -> Result<ObjectExt> {
 pub mod tests {
     use pest::Parser;
 
-    use super::{Rule, Y86AsmParser};
+    use super::{assemble, AssembleOption, Rule, Y86AsmParser};
 
     pub const RSUM_YS: &str = r#"
-# Weiyao Huang 2200012952
-    .pos 0 # start position FIXME: why does memory change
+    .pos 0
     irmovq stack, %rsp
     irmovq ele1, %rdi
     call sum_list
@@ -522,13 +531,26 @@ stack: # start of stack
     #[test]
     fn test_parser() {
         let lines = Y86AsmParser::parse(Rule::main, RSUM_YS)
-            .unwrap()
+            .expect("test failed")
             .next()
-            .unwrap()
+            .expect("test failed")
             .into_inner();
         // iterate all lines
         for line in lines.filter(|l| l.as_rule() == Rule::line) {
             dbg!(line);
         }
+    }
+
+    #[test]
+    fn test_undefined_label() {
+        let e = assemble(
+            r#"
+            # Test
+            jmp L1
+        "#,
+            AssembleOption::default(),
+        )
+        .unwrap_err();
+        eprintln!("{:#}", e);
     }
 }

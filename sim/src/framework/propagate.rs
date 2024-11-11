@@ -73,7 +73,7 @@ pub fn topo<Node: Copy + Eq + Hash + Debug>(
         levels.push(head);
         for (from, to) in edges.clone() {
             if from == head {
-                let entry = degree_level.get_mut(&to).unwrap();
+                let entry = degree_level.get_mut(&to).expect("topo: node not found");
                 *entry -= 1;
                 if *entry == 0 {
                     que.push_back(to);

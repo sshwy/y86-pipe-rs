@@ -27,7 +27,11 @@ impl Parse for HclData {
             .iter()
             .find_map(|attr| {
                 if attr.path().is_ident("hardware") {
-                    let value = &attr.meta.require_name_value().unwrap().value;
+                    let value = &attr
+                        .meta
+                        .require_name_value()
+                        .expect("invalid #[hardware = ...] attribute")
+                        .value;
                     // parse value as path
                     let syn::Expr::Path(path) = value else {
                         panic!("hardware attribute must be a path");
@@ -39,13 +43,15 @@ impl Parse for HclData {
                 }
             })
             .cloned()
-            .unwrap();
+            .expect("missing #[hardware = ...] attribute");
 
         let stage_alias = attrs
             .iter()
             .find_map(|attr| {
                 if attr.path().is_ident("stage_alias") {
-                    let stage_alias = attr.parse_args::<items::StageAlias>().unwrap();
+                    let stage_alias = attr
+                        .parse_args::<items::StageAlias>()
+                        .expect("invalid #[stage_alias(...)] attribute");
 
                     Some(stage_alias)
                 } else {
@@ -58,7 +64,11 @@ impl Parse for HclData {
             .iter()
             .find_map(|attr| {
                 if attr.path().is_ident("program_counter") {
-                    let value = &attr.meta.require_name_value().unwrap().value;
+                    let value = &attr
+                        .meta
+                        .require_name_value()
+                        .expect("invalid #[program_counter = ...] attribute")
+                        .value;
                     // parse value as path
                     let syn::Expr::Path(path) = value else {
                         panic!("program_counter attribute must be a path");
@@ -69,13 +79,17 @@ impl Parse for HclData {
                     None
                 }
             })
-            .unwrap();
+            .expect("missing #[program_counter = ...] attribute");
 
         let termination = attrs
             .iter()
             .find_map(|attr| {
                 if attr.path().is_ident("termination") {
-                    let value = &attr.meta.require_name_value().unwrap().value;
+                    let value = &attr
+                        .meta
+                        .require_name_value()
+                        .expect("invalid #[termination = ...] attribute")
+                        .value;
                     // parse value as path
                     let syn::Expr::Path(path) = value else {
                         panic!("program_counter attribute must be a path");
@@ -86,7 +100,7 @@ impl Parse for HclData {
                     None
                 }
             })
-            .unwrap();
+            .expect("missing #[termination = ...] attribute");
 
         let mut use_items = Vec::new();
         let mut intermediate_signals = Vec::new();
@@ -139,7 +153,12 @@ impl Parse for HclData {
                 let sig = intermediate_signals
                     .iter_mut()
                     .find(|s| s.name == fieldvalue.1)
-                    .unwrap();
+                    .ok_or_else(|| {
+                        syn::Error::new(
+                            uname.span(),
+                            uname.to_string() + ": signal not found for input assignment",
+                        )
+                    })?;
                 sig.destinations.push(items::SignalDest {
                     dest: LValue([uname.clone(), fieldvalue.0].into_iter().collect()),
                     tunnel: None,
@@ -148,14 +167,19 @@ impl Parse for HclData {
             }
         }
         for stage_input in set_stages {
-            let uname = stage_input.name;
+            let sname = stage_input.name;
             for fieldvalue in stage_input.fields {
                 let sig = intermediate_signals
                     .iter_mut()
                     .find(|s| s.name == fieldvalue.1)
-                    .unwrap();
+                    .ok_or_else(|| {
+                        syn::Error::new(
+                            sname.span(),
+                            sname.to_string() + ": signal not found for input assignment",
+                        )
+                    })?;
                 sig.destinations.push(items::SignalDest {
-                    dest: LValue([uname.clone(), fieldvalue.0].into_iter().collect()),
+                    dest: LValue([sname.clone(), fieldvalue.0].into_iter().collect()),
                     tunnel: None,
                     is_stage_field: true,
                 });
@@ -655,7 +679,7 @@ impl HclData {
 /// inputs of units through Boolean expressions.
 #[proc_macro]
 pub fn hcl(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let data: HclData = syn::parse(item).unwrap();
+    let data: HclData = syn::parse(item).expect("parse HCL error");
     data.render().into()
 }
 
@@ -672,8 +696,13 @@ pub fn extra_pipelines(_item: proc_macro::TokenStream) -> proc_macro::TokenStrea
     let mut idents = Vec::new();
 
     let dir = dir.join("src/architectures/extra");
-    for entry in std::fs::read_dir(dir).unwrap().filter_map(Result::ok) {
-        if entry.file_type().unwrap().is_file() && entry.file_name() != "mod.rs" {
+    for entry in std::fs::read_dir(dir)
+        .expect("fail to read architecture dir")
+        .filter_map(Result::ok)
+    {
+        if entry.file_type().expect("fail to get file type").is_file()
+            && entry.file_name() != "mod.rs"
+        {
             if let Some(mod_name) = entry
                 .file_name()
                 .to_string_lossy()

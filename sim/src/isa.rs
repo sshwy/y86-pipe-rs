@@ -232,6 +232,12 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
     let mut reg_cc = ConditionCode::default();
     let mut reg_file = [0u64; 16];
 
+    fn get_rsp(reg_file: &mut RegFile) -> &mut u64 {
+        reg_file
+            .get_mut(reg_code::RSP as usize)
+            .expect("fail to get rsp")
+    }
+
     let mut n_insts = 0;
 
     loop {
@@ -423,7 +429,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 print_v!(v);
                 print_end!();
 
-                let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
+                let rsp = get_rsp(&mut reg_file);
                 *rsp = rsp.checked_sub(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
                 put_u64(
                     &mut bin[(*rsp as usize)..(*rsp as usize + 8)],
@@ -439,7 +445,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 print_inst!();
                 print_end!();
 
-                let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
+                let rsp = get_rsp(&mut reg_file);
                 let v = get_u64(&bin[(*rsp as usize)..(*rsp as usize + 8)]);
 
                 *rsp = rsp.checked_add(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
@@ -458,7 +464,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
                 let va = reg_file[ra];
 
-                let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
+                let rsp = get_rsp(&mut reg_file);
                 *rsp = rsp.checked_sub(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
                 let new_rsp = *rsp as usize;
                 put_u64(&mut bin[new_rsp..(new_rsp + 8)], va);
@@ -476,7 +482,7 @@ pub fn simulate(mut bin: [u8; BIN_SIZE], tty_out: bool) -> anyhow::Result<Standa
 
                 let ra = ensure_reg(bin[pc + 1] >> 4)?;
 
-                let rsp = reg_file.get_mut(reg_code::RSP as usize).unwrap();
+                let rsp = get_rsp(&mut reg_file);
                 let old_rsp = *rsp as usize;
                 *rsp = rsp.checked_add(8).ok_or(anyhow::anyhow!("rsp overflow"))?;
                 reg_file[ra] = get_u64(&bin[old_rsp..(old_rsp + 8)]);

@@ -84,7 +84,7 @@ fn main() -> Result<()> {
         None
     };
 
-    let arch = args.arch.unwrap();
+    let arch = args.arch.expect("architecture is required");
     if !arch_names().contains(&arch.as_str()) {
         let mut cmd = Args::command();
         cmd.error(
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
         let mem = MemData::init(a.obj.init_mem());
         let mut pipe = create_sim(arch, mem.clone(), true);
 
-        let max_cpu_cycle = args.max_cpu_cycle.unwrap();
+        let max_cpu_cycle = args.max_cpu_cycle.expect("max_cpu_cycle is required");
         while !pipe.is_terminate() {
             pipe.step();
             if pipe.cycle_count() > max_cpu_cycle {

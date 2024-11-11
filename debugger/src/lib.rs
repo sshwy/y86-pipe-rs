@@ -32,7 +32,11 @@ pub fn start_tcp_listener(port: u16, option: SimOption) -> anyhow::Result<()> {
                 std::thread::Builder::new()
                     .stack_size(32 << 20)
                     .spawn(move || {
-                        let server = server::DebugServer::new(s.try_clone().unwrap(), s, option);
+                        let server = server::DebugServer::new(
+                            s.try_clone().expect("fail to clone tcp stream"),
+                            s,
+                            option,
+                        );
                         let r = server.start();
                         tracing::trace!("connection closed, result: {:?}", r);
                     })?;
