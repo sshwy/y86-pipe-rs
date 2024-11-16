@@ -16,6 +16,7 @@ struct HclData {
     stage_decls: Vec<items::StageDecl>,
     use_items: Vec<syn::ItemUse>,
     intermediate_signals: Vec<items::SignalDef>,
+    rval_names: Vec<syn::Ident>,
 }
 
 impl Parse for HclData {
@@ -147,20 +148,20 @@ impl Parse for HclData {
             }
         }
 
+        // These names are to be checked for existence
+        let mut rval_names = Vec::new();
+
         for unit_input in set_inputs {
             let uname = unit_input.name;
-            for fieldvalue in unit_input.fields {
-                let sig = intermediate_signals
-                    .iter_mut()
-                    .find(|s| s.name == fieldvalue.1)
-                    .ok_or_else(|| {
-                        syn::Error::new(
-                            uname.span(),
-                            uname.to_string() + ": signal not found for input assignment",
-                        )
-                    })?;
+            for items::FieldAssign(lval, rval) in unit_input.fields {
+                rval_names.push(rval.clone());
+                // We have rval_check_fn to check if the rval exists
+                // If not, compiler will report an friendly error
+                let Some(sig) = intermediate_signals.iter_mut().find(|s| s.name == rval) else {
+                    continue;
+                };
                 sig.destinations.push(items::SignalDest {
-                    dest: LValue([uname.clone(), fieldvalue.0].into_iter().collect()),
+                    dest: LValue([uname.clone(), lval].into_iter().collect()),
                     tunnel: None,
                     is_stage_field: false,
                 });
@@ -168,18 +169,15 @@ impl Parse for HclData {
         }
         for stage_input in set_stages {
             let sname = stage_input.name;
-            for fieldvalue in stage_input.fields {
-                let sig = intermediate_signals
-                    .iter_mut()
-                    .find(|s| s.name == fieldvalue.1)
-                    .ok_or_else(|| {
-                        syn::Error::new(
-                            sname.span(),
-                            sname.to_string() + ": signal not found for input assignment",
-                        )
-                    })?;
+            for items::FieldAssign(lval, rval) in stage_input.fields {
+                rval_names.push(rval.clone());
+                // We have rval_check_fn to check if the rval exists
+                // If not, compiler will report an friendly error
+                let Some(sig) = intermediate_signals.iter_mut().find(|s| s.name == rval) else {
+                    continue;
+                };
                 sig.destinations.push(items::SignalDest {
-                    dest: LValue([sname.clone(), fieldvalue.0].into_iter().collect()),
+                    dest: LValue([sname.clone(), lval].into_iter().collect()),
                     tunnel: None,
                     is_stage_field: true,
                 });
@@ -194,6 +192,7 @@ impl Parse for HclData {
             use_items,
             intermediate_signals,
             stage_decls,
+            rval_names,
         })
     }
 }
@@ -543,6 +542,22 @@ impl HclData {
         }
     }
 
+    fn render_rval_check_fn(&self) -> proc_macro2::TokenStream {
+        let rval_names = &self.rval_names;
+        let stmts = rval_names
+            .iter()
+            .map(|name| quote! { let _ = c_.#name; })
+            .reduce(|a, b| quote! { #a #b })
+            .unwrap_or_default();
+        quote! {
+            #[allow(unused)]
+            fn check_rval_names(c_: IntermediateSignal) -> ! {
+                #stmts
+                panic!("this function should not be called");
+            }
+        }
+    }
+
     fn render(&self) -> proc_macro2::TokenStream {
         let hardware = &self.hardware;
         let use_stmts = self
@@ -558,6 +573,7 @@ impl HclData {
         let get_stage_info_fn = self.render_get_stage_info();
         let pc_name = &self.program_counter;
         let termination = &self.termination;
+        let rval_check_fn = self.render_rval_check_fn();
 
         quote! {
             use #hardware::*;
@@ -582,6 +598,7 @@ impl HclData {
 
             impl crate::framework::PipeSim<Arch> {
                 #update_fn
+                #rval_check_fn
             }
             impl std::fmt::Display for crate::framework::PipeSim<Arch> {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
