@@ -14,11 +14,11 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 You can verify the installation by executing the command `rustup`.
 
-Install and the Rust toolchain by executing the following command (by the time of writing, the latest stable version is 1.81):
+Install and the Rust toolchain by executing the following command (by the time of writing, the latest stable version is 1.86):
 
 ```bash
-rustup install 1.81
-rustup default 1.81
+rustup install 1.86
+rustup default 1.86
 ```
 
 ## Build the Project
@@ -113,7 +113,7 @@ To simulate a Y86-64 assembly file w.r.t. the Y86 ISA specification, you can exe
 
 For example, by running `./target/debug/yis swap.yo`, the simulator will print the following information:
 
-```
+```text
 0x0000  icode: 0x3 (IRMOVQ), ifun: 0, rA: RNONE, rB: RSP, V: 0x200
 0x000a  icode: 0x3 (IRMOVQ), ifun: 0, rA: RNONE, rB: RDI, V: 0x50
 0x0014  icode: 0x5 (MRMOVQ), ifun: 0, rA: RDX, rB: RDI
@@ -172,7 +172,7 @@ You can also inspect an architecture via `-I` option:
 
 Its output will be like:
 
-```
+```text
 propagate order:
 lv.1: pc
 lv.2: imem align icode ifun instr_valid mem_read mem_write need_regids need_valC set_cc alufun
@@ -187,7 +187,7 @@ dependency graph visualization is generated at: seq_plus_std_dependency_graph.ht
 
 Here an HTML file is generated to visualize the dependency graph of the architecture. You can open the HTML file in a browser to view the dependency graph. In the graph, blue blocks are hardware components, and red blocks are signals. You can drag each block to change its position.
 
-![](assets/visualization-screenshot.png)
+![visualization](assets/visualization-screenshot.png)
 
 ## Debugger Usage
 
@@ -213,7 +213,7 @@ By default, your assembly file is simulated with the `seq_std` architecture. If 
 
 Refer to [y86-debugger](https://github.com/sshwy/y86-debugger) for more information.
 
-![](assets/debugger-screenshot.png)
+![debugger](assets/debugger-screenshot.png)
 
 ## HCL-rs Specification
 
